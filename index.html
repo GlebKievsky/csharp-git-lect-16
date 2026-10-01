@@ -1,0 +1,2950 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<script>
+/* Тема применяется ДО первой отрисовки: без вспышки светлой темы */
+(function () {
+  var d = document.documentElement;
+  try {
+    var t = localStorage.getItem('gitundo-theme');
+    if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+  } catch (e) {}
+  d.classList.add('js', 'preload');
+})();
+</script>
+<title>Git: отмена изменений и архивация — конспект лекции</title>
+<meta name="description" content="Подробный конспект для новичков: git restore, reset, revert, commit --amend, clean, stash, reflog и archive.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5FA">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1125">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232E44D6'/%3E%3Cpath d='M6 20h20' stroke='%23fff' stroke-opacity='.45' stroke-width='2'/%3E%3Ccircle cx='8' cy='20' r='3.2' fill='%23fff'/%3E%3Ccircle cx='16' cy='20' r='3.2' fill='%23fff'/%3E%3Ccircle cx='24' cy='20' r='3' fill='none' stroke='%23fff' stroke-width='1.6' stroke-dasharray='2 1.6'/%3E%3Cpath d='M24 13.5c-1.5-5-8-5.5-9.6-1.2' fill='none' stroke='%23FFD54A' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12.6 9.8l1.8 2.8 3-1.6' fill='none' stroke='%23FFD54A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+/* =========================================================
+   ТОКЕНЫ ТЕМЫ
+   Светлая по умолчанию; тёмная — по системной настройке
+   или явному выбору (data-theme). Всё решается в CSS,
+   поэтому первая отрисовка сразу в правильной теме.
+   ========================================================= */
+:root{
+  --paper:#F3F5FA; --surface:#FFFFFF; --surface-2:#E9EDF7; --surface-3:#DDE3F2;
+  --ink:#151935; --ink-2:#4A5176; --ink-3:#737A9C; --line:#D9DEEC; --line-2:#BFC7DE;
+  --accent:#2E44D6; --accent-2:#1B2FA8; --accent-soft:#E1E6FF; --on-accent:#FFFFFF;
+  --pink:#C02D76; --pink-soft:#FBE2EE; --on-pink:#FFFFFF;
+  --safe:#17804D; --safe-soft:#DBF1E5; --warn:#8A5905; --warn-soft:#FBEED2; --warn-dot:#E6A019;
+  --danger:#C62B24; --danger-soft:#FCE1DE;
+  --code-bg:#171B39; --code-bar:#1F2448; --code-ink:#E3E6F7; --code-dim:#8C93BC; --code-line:#2B3161;
+  --inv-bg:#151935; --inv-ink:#F3F5FA; --inv-dim:#AEB4D6; --inv-soft:rgba(255,255,255,.07); --inv-accent:#8E9DFF; --inv-line:transparent; --inv-code:rgba(255,255,255,.1);
+  --lit:1; --glass:#FFD54A; --glass-stroke:#C08900; --filament:#FFF8D6; --ray:#E3A300; --glow:rgba(255,196,40,.55); --cap:#5A6186;
+  --shadow-float:0 22px 48px -22px rgba(21,25,53,.38),0 2px 6px -2px rgba(21,25,53,.10);
+  --radius-l:22px; --radius-m:14px; --radius-s:9px;
+  --font-body:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-display:"Unbounded","Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1125; --surface:#151935; --surface-2:#1D2246; --surface-3:#262C57;
+    --ink:#E8EAF7; --ink-2:#A6ACCF; --ink-3:#7D84AC; --line:#272D57; --line-2:#383F72;
+    --accent:#8E9DFF; --accent-2:#B4BEFF; --accent-soft:#232B63; --on-accent:#0E1125;
+    --pink:#F27DB6; --pink-soft:#3A1D3A; --on-pink:#1B0B16;
+    --safe:#54CE8E; --safe-soft:#14352A; --warn:#F2BA4E; --warn-soft:#382C13; --warn-dot:#F2BA4E;
+    --danger:#FF7B71; --danger-soft:#3E1C23;
+    --code-bg:#0A0C1E; --code-bar:#121531; --code-ink:#E3E6F7; --code-dim:#7F87B2; --code-line:#1E244B;
+    --inv-bg:#191E47; --inv-ink:#EEF0FF; --inv-dim:#B3B9DD; --inv-soft:rgba(255,255,255,.045); --inv-accent:#8E9DFF; --inv-line:#323A7C; --inv-code:rgba(255,255,255,.09);
+    --lit:0; --glass:rgba(150,160,210,.07); --glass-stroke:#6A729E; --filament:#4E5680; --ray:#6A729E; --glow:rgba(255,196,40,0); --cap:#6A729E;
+    --shadow-float:0 22px 48px -22px rgba(0,0,0,.7),0 2px 6px -2px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1125; --surface:#151935; --surface-2:#1D2246; --surface-3:#262C57;
+  --ink:#E8EAF7; --ink-2:#A6ACCF; --ink-3:#7D84AC; --line:#272D57; --line-2:#383F72;
+  --accent:#8E9DFF; --accent-2:#B4BEFF; --accent-soft:#232B63; --on-accent:#0E1125;
+  --pink:#F27DB6; --pink-soft:#3A1D3A; --on-pink:#1B0B16;
+  --safe:#54CE8E; --safe-soft:#14352A; --warn:#F2BA4E; --warn-soft:#382C13; --warn-dot:#F2BA4E;
+  --danger:#FF7B71; --danger-soft:#3E1C23;
+  --code-bg:#0A0C1E; --code-bar:#121531; --code-ink:#E3E6F7; --code-dim:#7F87B2; --code-line:#1E244B;
+  --inv-bg:#191E47; --inv-ink:#EEF0FF; --inv-dim:#B3B9DD; --inv-soft:rgba(255,255,255,.045); --inv-accent:#8E9DFF; --inv-line:#323A7C; --inv-code:rgba(255,255,255,.09);
+  --lit:0; --glass:rgba(150,160,210,.07); --glass-stroke:#6A729E; --filament:#4E5680; --ray:#6A729E; --glow:rgba(255,196,40,0); --cap:#6A729E;
+  --shadow-float:0 22px 48px -22px rgba(0,0,0,.7),0 2px 6px -2px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+
+/* =========================================================
+   БАЗА
+   ========================================================= */
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--paper);color:var(--ink);-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:84px;overflow-x:hidden}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:1.0625rem;line-height:1.65;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;overflow-x:clip}
+.preload *,.preload *::before,.preload *::after{transition:none!important}
+img,svg{max-width:100%}
+a{color:var(--accent);text-decoration-thickness:1.5px;text-underline-offset:3px}
+a:hover{color:var(--accent-2)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
+::selection{background:var(--accent-soft);color:var(--ink)}
+p{margin:0 0 1em}
+ul,ol{margin:0 0 1.1em;padding-left:1.3em}
+li{margin:.35em 0}
+li::marker{color:var(--ink-3)}
+strong,b{font-weight:600}
+h1,h2{font-family:var(--font-display);font-weight:600;letter-spacing:-.02em;line-height:1.12;margin:0;overflow-wrap:break-word}
+h3{font-family:var(--font-body);font-weight:700;font-size:1.36rem;line-height:1.3;letter-spacing:-.005em;margin:0 0 .65em}
+h4{font-family:var(--font-body);font-weight:700;font-size:1.1rem;line-height:1.35;margin:1.8em 0 .6em}
+code,kbd,pre{font-family:var(--font-mono)}
+code{font-size:.85em;background:var(--surface-2);color:var(--ink);padding:.12em .4em;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone;overflow-wrap:anywhere}
+button{font-family:inherit}
+.ico{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--ink-2)}
+.nowrap{white-space:nowrap}
+.skip{position:absolute;left:12px;top:-80px;z-index:200;background:var(--accent);color:var(--on-accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:600}
+.skip:focus{top:10px;color:var(--on-accent)}
+
+/* =========================================================
+   ВЕРХНЯЯ ПАНЕЛЬ
+   ========================================================= */
+.topbar{position:sticky;top:0;z-index:60;height:64px;display:flex;align-items:center;gap:12px;padding:0 max(18px,env(safe-area-inset-right)) 0 max(18px,env(safe-area-inset-left));background:var(--paper);border-bottom:1px solid var(--line)}
+@supports ((backdrop-filter:blur(4px)) or (-webkit-backdrop-filter:blur(4px))) and (background:color-mix(in srgb,red 50%,transparent)){
+  .topbar{background:color-mix(in srgb,var(--paper) 82%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4)}
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;color:var(--ink);text-decoration:none}
+.brand:hover{color:var(--ink)}
+.brand-mark{flex:none;width:32px;height:32px}
+.brand-mark .bm-line{stroke:var(--line-2);stroke-width:2}
+.brand-mark .bm-node{fill:var(--accent)}
+.brand-mark .bm-ghost{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-dasharray:2 1.8}
+.brand-mark .bm-arc{fill:none;stroke:var(--pink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.brand-text{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+.brand-name{font-family:var(--font-display);font-weight:600;font-size:.9rem;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-sub{font-size:.78rem;color:var(--ink-3);white-space:nowrap}
+.bn-short{display:none}
+.topbar-spacer{flex:1}
+.toc-btn{display:none;align-items:center;gap:8px;height:38px;padding:0 13px;border-radius:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-weight:600;font-size:.88rem;cursor:pointer}
+.toc-btn:hover{border-color:var(--accent);color:var(--accent)}
+.progress{position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);transform-origin:0 50%;transform:scaleX(var(--p,0));pointer-events:none}
+
+/* ---------- переключатель темы: лампочка ---------- */
+.theme-ctl{display:flex;align-items:flex-start;gap:4px;align-self:flex-start;height:64px}
+.auto-btn{margin-top:17px;height:30px;padding:0 11px 0 9px;border-radius:999px;border:1px solid var(--line-2);background:transparent;color:var(--ink-3);font-weight:600;font-size:.78rem;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .25s,color .25s,border-color .25s}
+.auto-btn .ico{width:14px;height:14px;stroke-width:1.8}
+.auto-btn .ico .fillme{fill:currentColor;stroke:none}
+.auto-btn:hover{border-color:var(--accent);color:var(--accent)}
+.auto-btn[aria-pressed="true"]{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.lamp{position:relative;width:46px;height:64px;padding:0;border:0;background:none;color:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;-webkit-tap-highlight-color:transparent}
+.lamp:focus-visible{outline:none}
+.lamp:focus-visible .lamp-bulb{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
+.lamp-cord{display:block;width:2px;height:11px;background:var(--cap);border-radius:0 0 2px 2px;transform-origin:50% 0;transition:transform .55s cubic-bezier(.34,1.9,.5,1)}
+.lamp-bulb{display:block;width:34px;height:44px;overflow:visible;transform-origin:50% 0;transition:transform .55s cubic-bezier(.34,1.9,.5,1)}
+.lamp:hover .lamp-bulb{transform:rotate(-7deg)}
+.lamp.pull .lamp-cord{transform:scaleY(1.9)}
+.lamp.pull .lamp-bulb{transform:translateY(10px)}
+.lamp-halo{position:absolute;left:50%;top:39px;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;background:radial-gradient(circle,var(--glow) 0%,rgba(255,196,40,0) 66%);opacity:var(--lit);transform:scale(calc(.35 + .65 * var(--lit)));transition:opacity .5s ease,transform .7s cubic-bezier(.2,.9,.3,1.2);pointer-events:none}
+.lamp .glass{fill:var(--glass);stroke:var(--glass-stroke);stroke-width:1.8;transition:fill .45s ease,stroke .45s ease}
+.lamp .filament{fill:none;stroke:var(--filament);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:stroke .45s ease}
+.lamp .shine{fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;opacity:calc(var(--lit) * .7);transition:opacity .45s}
+.lamp .cap{fill:var(--cap);transition:fill .45s}
+.lamp .rays{transform-origin:20px 34px;transform:scale(calc(.55 + .45 * var(--lit))) rotate(calc((1 - var(--lit)) * -12deg));opacity:var(--lit);transition:opacity .45s ease,transform .6s cubic-bezier(.2,.9,.3,1.3)}
+.lamp .rays line{stroke:var(--ray);stroke-width:2.2;stroke-linecap:round}
+@keyframes flicker{0%{opacity:.15}10%{opacity:1}18%{opacity:.3}30%{opacity:1}42%{opacity:.55}56%,100%{opacity:1}}
+.lamp.flicker .glass-g,.lamp.flicker .lamp-halo,.lamp.flicker .rays{animation:flicker .7s steps(1,end)}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+html.vt-off::view-transition-old(root){z-index:2}
+html.vt-off::view-transition-new(root){z-index:1}
+
+/* =========================================================
+   ГЕРОЙ
+   ========================================================= */
+.hero-wrap{position:relative;border-bottom:1px solid var(--line);overflow:hidden}
+.hero-wrap::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,var(--line-2) 1.1px,transparent 1.5px);background-size:24px 24px;-webkit-mask-image:radial-gradient(ellipse 75% 95% at 72% 45%,#000 15%,transparent 72%);mask-image:radial-gradient(ellipse 75% 95% at 72% 45%,#000 15%,transparent 72%);pointer-events:none}
+.hero{position:relative;max-width:1260px;margin:0 auto;padding:clamp(40px,7vw,96px) 28px clamp(48px,6vw,84px);display:grid;grid-template-columns:minmax(0,1.22fr) minmax(0,.78fr);gap:clamp(32px,5vw,72px);align-items:center}
+.hero h1{font-size:clamp(2rem,1.2rem + 2.7vw,3.25rem);line-height:1.06;letter-spacing:-.03em}
+.hero-lead{font-size:clamp(1.08rem,1rem + .35vw,1.24rem);line-height:1.55;color:var(--ink-2);max-width:32em;margin:24px 0 28px}
+.hero-chips-t{font-weight:600;font-size:.9rem;color:var(--ink-2);margin:0 0 10px}
+.hero-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;font:500 .84rem/1 var(--font-mono);padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);text-decoration:none;transition:border-color .2s,color .2s,transform .2s}
+.chip:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+.hero-need{margin:24px 0 0;font-size:.92rem;color:var(--ink-3)}
+
+.demo{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-l);box-shadow:var(--shadow-float);overflow:hidden}
+.demo-graph{--lg-h:132px;margin:10px 20px 0}
+.term{background:var(--code-bg);color:var(--code-ink);font:500 .8rem/1.8 var(--font-mono);padding:16px 18px;height:calc(8 * 1.8em + 32px);overflow:hidden}
+.term .ln{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.term .pr{color:var(--pink)}
+.term .o{color:var(--code-dim)}
+.term .o b{color:#FFD37D;font-weight:500}
+.term .ln.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,100%{background:transparent}25%,70%{background:rgba(255,211,125,.14)}}
+.term .cur{display:inline-block;width:.55em;height:1.05em;background:var(--code-ink);vertical-align:-.18em;animation:blink 1s steps(1) infinite;margin-left:1px}
+@keyframes blink{50%{opacity:0}}
+.demo-cap{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-top:1px solid var(--line);font-size:.92rem;line-height:1.45;color:var(--ink-2);min-height:72px}
+.ghost-btn{display:inline-flex;align-items:center;gap:7px;flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-weight:600;font-size:.84rem;cursor:pointer;transition:border-color .2s,color .2s,opacity .3s}
+.ghost-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ghost-btn .ico{width:15px;height:15px}
+.ghost-btn[hidden]{display:none}
+
+/* ---------- живой граф коммитов (HTML) ---------- */
+.lg{position:relative;height:var(--lg-h,128px);--sz:44px;--top:30px}
+.lg-edge{position:absolute;top:calc(var(--top) + var(--sz) / 2 - 1.25px);height:2.5px;left:calc((var(--i) + .5) * 100% / var(--n));width:calc(100% / var(--n));background:var(--line-2);transition:opacity .5s ease}
+.lg-edge.ghost{background:repeating-linear-gradient(90deg,var(--ink-3) 0 6px,transparent 6px 11px);opacity:.55}
+.lg-node{position:absolute;top:var(--top);left:calc((var(--i) + .5) * 100% / var(--n));width:var(--sz);height:var(--sz);margin-left:calc(var(--sz) / -2);border-radius:50%;border:2.5px solid var(--accent);background:var(--surface);color:var(--accent);display:grid;place-items:center;font:600 .92rem/1 var(--font-display);z-index:1;transition:border-color .5s,color .5s,opacity .5s,transform .5s,background .35s,box-shadow .35s}
+.lg-node.ghost{border-style:dashed;border-color:var(--line-2);color:var(--ink-3);background:var(--surface);transform:scale(.88)}
+.lg-node.target{background:var(--accent);color:var(--on-accent);box-shadow:0 0 0 6px var(--accent-soft)}
+.lg-node.ghost.target{border-style:solid;border-color:var(--accent);opacity:1;transform:none}
+.lg-node[data-label]::after{content:attr(data-label);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);font:600 .72rem/1 var(--font-mono);background:var(--ink);color:var(--paper);padding:5px 8px;border-radius:7px;white-space:nowrap}
+.lg-node.pulse{animation:pulse 1.1s ease-out}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--accent)}100%{box-shadow:0 0 0 18px rgba(0,0,0,0)}}
+.lg-ptr{position:absolute;top:calc(var(--top) + var(--sz) + 6px);left:calc((var(--at) + .5) * 100% / var(--n));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;z-index:2;transition:left .85s cubic-bezier(.55,0,.2,1)}
+.lg-ptr::before{content:"";border:6px solid transparent;border-top:0;border-bottom-color:var(--accent)}
+.lg-tags{display:flex;gap:4px}
+.pill{display:inline-block;font:600 .72rem/1 var(--font-mono);padding:5px 8px;border-radius:7px;white-space:nowrap}
+.pill.branch{background:var(--accent);color:var(--on-accent)}
+.pill.head{background:var(--pink);color:var(--on-pink)}
+.lg.built .lg-node,.lg.built .lg-edge{animation:pop .5s cubic-bezier(.3,1.4,.5,1) both;animation-delay:calc(var(--i) * 140ms)}
+@keyframes pop{from{opacity:0;transform:scale(.4)}}
+
+/* =========================================================
+   КАРКАС СТРАНИЦЫ И ОГЛАВЛЕНИЕ
+   ========================================================= */
+.layout{max-width:1260px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:236px minmax(0,1fr);column-gap:clamp(40px,5vw,72px)}
+.content{min-width:0;max-width:800px;padding-bottom:40px}
+.toc{position:sticky;top:64px;align-self:start;max-height:calc(100vh - 64px);max-height:calc(100dvh - 64px);overflow-y:auto;padding:36px 4px 28px 0;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.toc-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px 34px}
+.toc-title{font-weight:600;font-size:.85rem;color:var(--ink-3);margin:0}
+.toc-close{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);align-items:center;justify-content:center;cursor:pointer}
+.toc-graph{position:relative}
+.toc-list{position:relative;list-style:none;margin:0;padding:0}
+.toc-track,.toc-fill{position:absolute;left:10px;top:17px;width:2px;border-radius:2px}
+.toc-track{bottom:17px;background:var(--line-2)}
+.toc-fill{height:0;background:var(--accent);transition:height .4s ease}
+.toc-list li{margin:0}
+.toc-list a{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);column-gap:12px;align-items:center;padding:7px 58px 7px 0;color:var(--ink-2);text-decoration:none;font-size:.9rem;line-height:1.3;border-radius:8px}
+.toc-list a:hover{color:var(--accent)}
+.toc-dot{position:relative;z-index:1;justify-self:center;width:12px;height:12px;border-radius:50%;border:2px solid var(--line-2);background:var(--paper);transition:border-color .3s,background .3s,transform .3s,box-shadow .3s}
+.toc-n{font:500 .72rem/1 var(--font-mono);color:var(--ink-3);margin-right:7px}
+.toc-list a.done .toc-dot{border-color:var(--accent);background:var(--accent)}
+.toc-list a.active{color:var(--ink);font-weight:600}
+.toc-list a.active .toc-dot{border-color:var(--accent);background:var(--paper);transform:scale(1.3);box-shadow:0 0 0 4px var(--accent-soft)}
+.toc-head{position:absolute;right:0;top:0;opacity:0;transform:translateY(var(--y,0));transition:transform .45s cubic-bezier(.3,1.25,.5,1),opacity .3s;font:600 .66rem/1 var(--font-mono);padding:5px 7px 5px 6px;border-radius:6px;background:var(--pink);color:var(--on-pink);pointer-events:none}
+.toc-head.on{opacity:1}
+.toc-head::before{content:"";position:absolute;right:100%;top:50%;margin-top:-5px;border:5px solid transparent;border-left:0;border-right-color:var(--pink)}
+.toc-note{margin:22px 0 0 34px;font-size:.8rem;line-height:1.45;color:var(--ink-3)}
+.toc-backdrop{display:none}
+
+/* =========================================================
+   РАЗДЕЛЫ
+   ========================================================= */
+.sec{padding:84px 0 12px;border-top:1px solid var(--line)}
+.sec:first-child{border-top:0}
+.sec-head{display:flex;gap:18px;align-items:flex-start;margin-bottom:28px}
+.sec-node{flex:none;width:50px;height:50px;margin-top:-2px;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--accent);background:var(--surface);color:var(--accent);font:600 1.05rem/1 var(--font-display)}
+.sec-head h2{font-size:clamp(1.55rem,1.1rem + 1.5vw,2.2rem)}
+.sec-head h2 code,.cmd h3 code{background:none;padding:0;border-radius:0;font-size:.9em;font-weight:600;color:var(--accent)}
+.sec-sub{margin:.55em 0 0;color:var(--ink-2);font-size:1.06rem;line-height:1.5}
+.sub{margin-top:56px}
+.sub > h3:first-child{margin-top:0}
+.lead{font-size:1.12rem;line-height:1.6}
+
+/* ---------- врезки ---------- */
+.callout{position:relative;margin:28px 0;padding:18px 22px 18px 58px;border-radius:var(--radius-m);background:var(--surface);border:1px solid var(--line)}
+.callout > .ico{position:absolute;left:20px;top:20px;width:22px;height:22px}
+.callout > :last-child{margin-bottom:0}
+.callout-t{display:block;font-weight:700;margin-bottom:4px}
+.callout.rule{background:var(--accent-soft);border-color:transparent}
+.callout.rule > .ico{color:var(--accent)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.warn > .ico{color:var(--warn)}
+.callout.danger{background:var(--danger-soft);border-color:transparent}
+.callout.danger > .ico{color:var(--danger)}
+.callout.tip{background:var(--safe-soft);border-color:transparent}
+.callout.tip > .ico{color:var(--safe)}
+.callout code{background:var(--surface)}
+
+/* ---------- бейджи опасности ---------- */
+.badge{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-body);font-weight:600;font-size:.8rem;line-height:1;padding:6px 11px 6px 9px;border-radius:999px;white-space:nowrap;vertical-align:middle;letter-spacing:0}
+.badge::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.badge.safe{background:var(--safe-soft);color:var(--safe)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.warn::before{background:var(--warn-dot)}
+.badge.danger{background:var(--danger-soft);color:var(--danger)}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle}
+.dot.safe{background:var(--safe)}.dot.warn{background:var(--warn-dot)}.dot.danger{background:var(--danger)}
+
+/* ---------- блоки кода ---------- */
+pre.sh,pre.out{margin:18px 0 22px;padding:16px 20px;background:var(--code-bg);color:var(--code-ink);border-radius:var(--radius-m);font-size:.85rem;line-height:1.7;overflow-x:auto;tab-size:2;white-space:pre}
+.code{margin:18px 0 24px;border-radius:var(--radius-m);background:var(--code-bg);overflow:hidden}
+.code-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;height:36px;padding:0 8px 0 16px;background:var(--code-bar);border-bottom:1px solid var(--code-line)}
+.code-label{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:600;color:var(--code-dim)}
+.code-label::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--code-dim);opacity:.6}
+.code.is-sh .code-label::before{background:#8FA0FF;opacity:1}
+.code.is-out .code-label::before{background:transparent;border:1.5px solid var(--code-dim)}
+.code pre.sh,.code pre.out{margin:0;border-radius:0;background:none}
+.copy{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:7px;border:0;background:transparent;color:var(--code-dim);font-size:.76rem;font-weight:600;cursor:pointer;transition:color .2s,background .2s}
+.copy:hover{color:#fff;background:rgba(255,255,255,.08)}
+.copy .ico{width:14px;height:14px}
+.copy.ok{color:#79E0A6}
+.t-git{color:#8FA0FF}
+.t-cmd{color:#FFFFFF;font-weight:600}
+.t-flag{color:#FFA2D0}
+.t-str{color:#9DE6B8}
+.t-ref{color:#FFD37D}
+.t-com{color:var(--code-dim)}
+.t-op{color:var(--code-dim)}
+.o-g{color:#79E0A6}.o-r{color:#FF8A84}.o-y{color:#FFD37D}.o-d{color:var(--code-dim)}.o-b{color:#fff;font-weight:600}.o-p{color:#FFA2D0}
+
+/* ---------- таблицы ---------- */
+.tbl{margin:22px 0 28px;overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius-m);background:var(--surface);-webkit-overflow-scrolling:touch}
+.tbl table{width:100%;border-collapse:collapse;font-size:.94rem;line-height:1.5}
+.tbl.wide table{min-width:600px}
+.tbl th{text-align:left;vertical-align:bottom;font-weight:600;font-size:.84rem;color:var(--ink-2);background:var(--surface-2);padding:11px 14px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--line);vertical-align:top}
+.tbl td:first-child code{white-space:nowrap}
+.tbl td.c{text-align:center;white-space:nowrap}
+.tbl .y{color:var(--safe);font-weight:700}
+.tbl .n{color:var(--ink-3)}
+.tbl .chg{color:var(--accent);font-weight:600}
+.tbl .del{color:var(--danger);font-weight:600}
+.tbl tr.empty td{text-align:center;color:var(--ink-3);padding:22px}
+
+/* ---------- фигуры и SVG-графы ---------- */
+.fig{margin:26px 0 30px;padding:22px;border:1px solid var(--line);border-radius:var(--radius-l);background:var(--surface)}
+.fig > figcaption,.fig-cap{margin-top:14px;font-size:.9rem;line-height:1.5;color:var(--ink-2)}
+.gpair{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 18px;align-items:center}
+.gpair + .gpair{margin-top:10px;padding-top:12px;border-top:1px dashed var(--line)}
+.gpair-l{font-weight:600;font-size:.86rem;color:var(--ink-3);min-width:3.2em}
+.graph{min-width:0}
+.graph svg{display:block;max-width:100%;height:auto}
+.graph .ge{stroke:var(--line-2);stroke-width:2.5;fill:none}
+.graph .ge.d{stroke:var(--ink-3);stroke-dasharray:5 5;opacity:.7}
+.graph .gn circle{fill:var(--surface);stroke:var(--accent);stroke-width:2.5}
+.graph .gn text{fill:var(--accent);font:600 12.5px var(--font-display);text-anchor:middle;dominant-baseline:central}
+.graph .gn.ghost circle{stroke:var(--ink-3);stroke-dasharray:4 3.5}
+.graph .gn.ghost text{fill:var(--ink-3)}
+.graph .gn.new circle{stroke:var(--pink);fill:var(--pink-soft)}
+.graph .gn.new text{fill:var(--pink)}
+.graph .gn.bad circle{stroke:var(--danger);fill:var(--danger-soft)}
+.graph .gn.bad text{fill:var(--danger)}
+.graph .gn.hl circle{fill:var(--accent)}
+.graph .gn.hl text{fill:var(--on-accent)}
+.graph .gt-pill rect{rx:7px}
+.graph .gt-branch rect{fill:var(--accent)}
+.graph .gt-branch text{fill:var(--on-accent)}
+.graph .gt-head rect{fill:var(--pink)}
+.graph .gt-head text{fill:var(--on-pink)}
+.graph .gt-pill text{font:600 11.5px var(--font-mono);dominant-baseline:central}
+.graph .gt-sub text{fill:var(--ink-2);font:500 11.5px var(--font-mono);text-anchor:middle}
+.graph .gt-note text{fill:var(--ink-2);font:500 13px var(--font-body);dominant-baseline:central}
+
+/* ---------- три места ---------- */
+.zones{display:grid;grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr) 92px minmax(0,1fr);align-items:stretch}
+.zone{border-radius:16px;padding:16px 16px 14px;background:var(--paper);border:1.5px solid var(--line)}
+.zone-name{font:600 .98rem/1.25 var(--font-display);letter-spacing:-.01em;margin-bottom:6px}
+.zone-where{display:inline-block;font:500 .74rem/1 var(--font-mono);color:var(--accent);background:var(--accent-soft);padding:4px 7px;border-radius:6px;margin-bottom:10px}
+.zone p{font-size:.88rem;line-height:1.45;color:var(--ink-2);margin:0}
+.zarrows{display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 6px}
+.za{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 .7rem/1.2 var(--font-mono);text-align:center}
+.za .ico{width:100%;height:14px;stroke-width:2}
+.za.fwd{color:var(--accent)}
+.za.back{color:var(--pink)}
+.za .ar{display:block;width:100%;height:12px;position:relative}
+.za .ar::before{content:"";position:absolute;left:4px;right:4px;top:50%;height:2px;margin-top:-1px;background:currentColor;border-radius:2px}
+.za .ar::after{content:"";position:absolute;top:50%;width:8px;height:8px;margin-top:-4px;border:solid currentColor;border-width:2px 2px 0 0}
+.za.fwd .ar::after{right:4px;transform:rotate(45deg)}
+.za.back .ar::after{left:4px;transform:rotate(-135deg)}
+.zreset{margin-top:14px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1.5px dashed var(--pink);color:var(--ink-2);font-size:.88rem;line-height:1.45}
+.zreset code{background:var(--pink-soft);color:var(--pink);font-weight:600;white-space:nowrap}
+
+/* ---------- цепочка HEAD → ветка → коммит ---------- */
+.chain{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.file{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper);min-width:0}
+.file-name{font:600 .74rem/1 var(--font-mono);color:var(--ink-2);background:var(--surface-2);padding:7px 10px;border-bottom:1px solid var(--line)}
+.file-body{font:500 .82rem/1.3 var(--font-mono);padding:10px 12px;color:var(--ink)}
+.chain-arrow{color:var(--ink-3);display:flex}
+.chain-arrow .ico{width:22px;height:22px}
+.cnode{display:inline-flex;align-items:center;gap:8px;font:600 .82rem/1 var(--font-mono);color:var(--accent)}
+.cnode::before{content:"";width:18px;height:18px;border-radius:50%;border:2.5px solid var(--accent);background:var(--surface)}
+
+/* ---------- два действия ---------- */
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0 24px}
+.two > div{padding:18px 18px 16px;border-radius:var(--radius-m);background:var(--surface);border:1px solid var(--line)}
+.two h4{margin:0 0 6px;font-size:1rem;display:flex;gap:10px;align-items:center}
+.two p{margin:0;font-size:.93rem;color:var(--ink-2)}
+.num{flex:none;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font:600 .82rem/1 var(--font-display)}
+
+/* ---------- главный закон ---------- */
+.law{position:relative;margin:8px 0 34px;padding:clamp(24px,4vw,40px);border-radius:26px;background:var(--inv-bg);color:var(--inv-ink);border:1px solid var(--inv-line);overflow:hidden}
+.law::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;border:2px dashed var(--inv-accent);opacity:.3}
+.law-text{position:relative;z-index:1;font:600 clamp(1.3rem,1rem + 1.25vw,1.85rem)/1.3 var(--font-display);letter-spacing:-.015em;margin:0 0 28px;max-width:24em}
+.law-split{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.law-half{border-radius:16px;padding:16px 18px;background:var(--inv-soft);border:1px solid var(--inv-line)}
+.law-half b{display:flex;align-items:center;gap:11px;font-size:1.04rem;margin-bottom:6px}
+.law-half p{margin:0;font-size:.92rem;line-height:1.5;color:var(--inv-dim)}
+.law-half code{background:var(--inv-code);color:var(--inv-ink)}
+.law-node{flex:none;width:22px;height:22px;border-radius:50%;border:2.5px solid var(--inv-accent)}
+.law-node.solid{background:var(--inv-accent)}
+.law-node.dashed{border-style:dashed;border-color:var(--inv-dim)}
+
+/* ---------- три вопроса ---------- */
+.qlist{counter-reset:q;list-style:none;padding:0;margin:20px 0 22px;display:grid;gap:10px}
+.qlist li{counter-increment:q;display:grid;grid-template-columns:46px minmax(0,1fr);gap:16px;align-items:center;margin:0;padding:14px 18px 14px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.qlist li::before{content:counter(q);display:grid;place-items:center;width:46px;height:46px;border-radius:13px;background:var(--accent-soft);color:var(--accent);font:600 1.2rem/1 var(--font-display)}
+.qlist b{display:block;font-size:1.05rem}
+.qlist span{display:block;font-size:.92rem;color:var(--ink-2);line-height:1.45;margin-top:2px}
+
+/* ---------- светофор ---------- */
+.lights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:24px 0 8px}
+.light{padding:22px 20px 20px;border-radius:var(--radius-l);background:var(--surface);border:1px solid var(--line)}
+.light-lamp{width:40px;height:40px;border-radius:50%;margin-bottom:16px;background:var(--c);box-shadow:0 0 0 7px var(--cs),0 0 30px -2px var(--c)}
+.light.safe{--c:var(--safe);--cs:var(--safe-soft)}
+.light.warn{--c:var(--warn-dot);--cs:var(--warn-soft)}
+.light.danger{--c:var(--danger);--cs:var(--danger-soft)}
+.light h3{font-size:1.12rem;margin:0 0 4px}
+.light > p{font-size:.9rem;color:var(--ink-2);margin:0 0 14px;line-height:1.45}
+.light ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+.light li{margin:0;font-size:.88rem;line-height:1.45;padding-top:9px;border-top:1px solid var(--line)}
+.light li:first-child{border-top:0;padding-top:0}
+.light li span{display:block;color:var(--ink-3);font-size:.84rem}
+
+/* ---------- лестница ---------- */
+.stairs{list-style:none;padding:0;margin:26px 0 12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+.stairs li{margin:0}
+.stairs a{display:flex;flex-direction:column;gap:6px;height:calc(104px + var(--h) * 40px);padding:14px 14px 12px;border-radius:14px 14px 6px 6px;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);color:var(--ink);text-decoration:none;transition:transform .25s,box-shadow .25s,border-color .25s}
+.stairs a:hover{transform:translateY(-4px);box-shadow:var(--shadow-float);color:var(--ink)}
+.st-n{font:600 .78rem/1 var(--font-body);color:var(--accent)}
+.st-s{font-weight:600;font-size:.95rem;line-height:1.3}
+.stairs a code{margin-top:auto;align-self:flex-start;font-size:.78rem;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.stairs-extra{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.stairs-extra a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px dashed var(--line-2);color:var(--ink-2);text-decoration:none;font-size:.9rem;line-height:1.35}
+.stairs-extra a:hover{border-color:var(--accent);color:var(--ink)}
+.stairs-extra code{flex:none;font-weight:600}
+
+/* ---------- карточка команды ---------- */
+.cmd{margin-top:64px;padding-top:4px}
+.cmd-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:12px}
+.cmd-step{font-weight:600;font-size:.82rem;line-height:1;color:var(--accent);background:var(--accent-soft);padding:7px 10px;border-radius:8px}
+.cmd h3{font-size:clamp(1.3rem,1.15rem + .6vw,1.6rem);margin-bottom:.7em}
+.cmd h3 .h3d{display:block;font-weight:600;font-size:.72em;color:var(--ink-2);margin-top:4px;letter-spacing:0}
+.lbl{font-weight:700;color:var(--ink)}
+.oldsyn{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:18px 0 0;padding:12px 14px;border-radius:12px;background:var(--surface-2);font-size:.9rem;color:var(--ink-2)}
+.oldsyn code{background:var(--surface)}
+.nuance{margin:18px 0}
+.nuance li{margin:.5em 0}
+
+/* ---------- панели-тренажёры ---------- */
+.sim{margin:28px 0 32px;border:1px solid var(--line);border-radius:var(--radius-l);background:var(--surface);overflow:hidden}
+.sim-head{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.sim-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-weight:700;font-size:1rem}
+.sim-tag{white-space:nowrap;font-weight:600;font-size:.74rem;line-height:1;color:var(--pink);background:var(--pink-soft);padding:5px 8px;border-radius:6px}
+.sim-body{padding:20px 18px 22px}
+.sim-hint{font-size:.9rem;color:var(--ink-2);margin:0 0 14px}
+.seg{display:inline-flex;flex-wrap:wrap;padding:4px;gap:4px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.seg button{border:0;background:none;color:var(--ink-2);font:600 .84rem/1 var(--font-mono);padding:9px 12px;border-radius:8px;cursor:pointer;transition:background .2s,color .2s}
+.seg button:hover{color:var(--accent)}
+.seg button[aria-checked="true"],.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.cmdline{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 14px;border-radius:12px;background:var(--code-bg);color:var(--code-ink);font:500 .88rem/1.4 var(--font-mono);overflow-x:auto;white-space:nowrap}
+.cmdline .pr{color:var(--pink)}
+.sim-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 14px}
+.sstep{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:12px;border:1.5px dashed var(--line-2);font-size:.86rem;line-height:1.4;color:var(--ink-3);transition:border-color .35s,background .35s,color .35s,opacity .35s}
+.sstep .num{width:24px;height:24px;border-radius:8px;font-size:.74rem;background:var(--surface-2);color:var(--ink-3);transition:background .35s,color .35s}
+.sstep.on{border-style:solid;border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.sstep.on .num{background:var(--accent);color:var(--on-accent)}
+.sstep.skipped{opacity:.55}
+.sim-zones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.szone{padding:12px;border-radius:12px;background:var(--paper);border:1.5px solid var(--line);transition:border-color .35s}
+.szone.changed{border-color:var(--accent)}
+.szone-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:600;font-size:.84rem;margin-bottom:4px}
+.szone-s{font-size:.78rem;color:var(--ink-3);margin-bottom:8px;min-height:1.3em}
+.szone ul{list-style:none;padding:0;margin:0;font:500 .78rem/1.5 var(--font-mono)}
+.szone li{margin:2px 0;padding:2px 8px;border-radius:6px;transition:background .35s,color .35s,opacity .35s}
+.szone li.st{background:var(--safe-soft);color:var(--safe)}
+.szone li.wk{background:var(--danger-soft);color:var(--danger)}
+.szone li.gone{opacity:.28;text-decoration:line-through}
+.sim-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:16px}
+.sim-status{flex:1 1 320px;margin:0}
+.sim-status pre.out{margin:0;min-height:110px;font-size:.8rem}
+.sim-explain{margin:14px 0 0;padding:12px 14px;border-radius:12px;background:var(--surface-2);font-size:.93rem;line-height:1.5;min-height:3.2em}
+
+/* HEAD~ vs HEAD@ */
+.hx-graph{--lg-h:150px;--top:44px;max-width:520px;margin:6px auto 0}
+.hx-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+
+/* ---------- stash ---------- */
+.stash-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}
+.stash-col-h{font-weight:600;font-size:.86rem;color:var(--ink-2);margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.stack{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;min-height:212px;padding:10px;border-radius:14px;background:var(--paper);border:1.5px solid var(--line)}
+.stack li{margin:0}
+.stack button{width:100%;display:flex;gap:10px;align-items:center;text-align:left;padding:10px 12px;border-radius:11px;background:var(--surface);border:1.5px solid var(--line);color:var(--ink);font-size:.88rem;line-height:1.3;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.stack button:hover{border-color:var(--accent)}
+.stack button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.stack .sref{flex:none;font:600 .78rem/1 var(--font-mono);color:var(--accent);padding:4px 6px;border-radius:6px;transition:background .3s}
+.stack li.new button{animation:dropin .45s cubic-bezier(.3,1.4,.5,1)}
+.stack li.renum .sref{animation:renum 1.2s ease}
+@keyframes dropin{from{transform:translateY(-16px);opacity:0}}
+@keyframes renum{0%,40%{background:var(--warn-soft);color:var(--warn)}100%{background:transparent}}
+.stack-empty{margin:auto;color:var(--ink-3);font-size:.88rem;text-align:center;padding:20px}
+.work{min-height:100px;padding:12px;border-radius:14px;background:var(--paper);border:1.5px solid var(--line)}
+.work ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.work li{margin:0;padding:7px 10px;border-radius:9px;background:var(--danger-soft);color:var(--danger);font:500 .8rem/1.35 var(--font-mono)}
+.work li.new{animation:dropin .45s cubic-bezier(.3,1.4,.5,1)}
+.work-clean{color:var(--safe);font-size:.88rem;font-weight:600;display:flex;gap:8px;align-items:center}
+.stash-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.act{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--line-2);background:var(--surface);color:var(--ink);font:600 .82rem/1 var(--font-mono);cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+.act:hover{border-color:var(--accent);color:var(--accent)}
+.act.main{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.act.main:hover{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent)}
+.act.soft{font-family:var(--font-body)}
+
+/* ---------- матрица-исследователь ---------- */
+.mx-cmds{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.mx-cmds button{border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font:600 .8rem/1 var(--font-mono);padding:9px 11px;border-radius:10px;cursor:pointer;transition:border-color .2s,background .2s,color .2s}
+.mx-cmds button:hover{border-color:var(--accent)}
+.mx-cmds button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.mx-zones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mxz{padding:14px;border-radius:14px;border:1.5px solid var(--line);background:var(--paper);transition:border-color .3s,background .3s}
+.mxz-h{font-weight:600;font-size:.84rem;color:var(--ink-2);margin-bottom:8px}
+.mxz-v{font-weight:600;font-size:.95rem;line-height:1.35}
+.mxz-d{font-size:.84rem;color:var(--ink-2);margin-top:4px;line-height:1.4}
+.mxz.s1{border-color:var(--accent);background:var(--accent-soft)}
+.mxz.s2{border-color:var(--danger);background:var(--danger-soft)}
+.mxz.s1 .mxz-v{color:var(--accent)}
+.mxz.s2 .mxz-v{color:var(--danger)}
+.mxz.s0 .mxz-v{color:var(--ink-3)}
+.mx-note{display:flex;gap:12px;align-items:flex-start;margin-top:14px;font-size:.92rem;line-height:1.5}
+.mx-note .badge{margin-top:1px}
+
+/* ---------- reset vs revert ---------- */
+.mnemo{margin:26px 0;padding:24px;border-radius:var(--radius-l);border:1.5px solid var(--line);background:var(--surface);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mnemo-i{padding:16px 18px;border-radius:14px;background:var(--paper)}
+.mnemo-w{font:600 clamp(1.25rem,1rem + 1vw,1.6rem)/1.2 var(--font-display);letter-spacing:-.01em}
+.mnemo-w u{text-decoration:none;color:var(--accent);border-bottom:3px solid currentColor}
+.mnemo-i p{margin:8px 0 0;color:var(--ink-2);font-size:.92rem;line-height:1.45}
+.mnemo-i.v .mnemo-w u{color:var(--pink)}
+
+/* ---------- reflog ---------- */
+.lr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:22px 0 26px}
+.lr > div{padding:18px;border-radius:var(--radius-m);border:1px solid var(--line);background:var(--surface)}
+.lr h4{margin:0 0 4px;font-family:var(--font-mono);font-size:1rem;color:var(--accent)}
+.lr .lr-s{margin:0 0 12px;font-size:.9rem;color:var(--ink-2);line-height:1.45}
+.lr ol{list-style:none;padding:0;margin:0;font:500 .78rem/1.5 var(--font-mono)}
+.lr li{margin:0;padding:6px 8px;border-top:1px solid var(--line);display:flex;gap:8px}
+.lr li:first-child{border-top:0}
+.lr li i{font-style:normal;color:var(--ink-3)}
+.lr li.miss{color:var(--ink-3);font-family:var(--font-body);font-size:.84rem}
+.vs{margin:26px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.vs > div{padding:18px;border-radius:var(--radius-m);background:var(--surface);border:1.5px solid var(--line)}
+.vs .vs-k{font:600 1.2rem/1 var(--font-mono);color:var(--accent);margin-bottom:8px}
+.vs > div:last-child .vs-k{color:var(--pink)}
+.vs.words .vs-k{font:600 1.15rem/1.2 var(--font-display);letter-spacing:-.01em}
+.vs p{margin:0;font-size:.93rem;line-height:1.5;color:var(--ink-2)}
+.scen{border:1px solid var(--line);border-radius:14px;background:var(--surface);margin:10px 0}
+.scen summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:15px 48px 15px 16px;font-weight:600;position:relative}
+.scen summary::-webkit-details-marker{display:none}
+.scen summary::after,.qa summary::after{content:"";position:absolute;right:20px;top:50%;width:9px;height:9px;border-right:2px solid var(--ink-3);border-bottom:2px solid var(--ink-3);transform:translateY(-70%) rotate(45deg);transition:transform .25s}
+.scen[open] summary::after,.qa[open] summary::after{transform:translateY(-25%) rotate(-135deg)}
+.scen-body{padding:0 18px 16px}
+.scen summary code{font-weight:600}
+.traps{display:grid;gap:10px;margin:18px 0}
+.traps > div{position:relative;padding:14px 18px 14px 50px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:.95rem;line-height:1.55;color:var(--ink-2)}
+.traps > div::before{content:"!";position:absolute;left:16px;top:14px;width:22px;height:22px;border-radius:7px;background:var(--warn-soft);color:var(--warn);display:grid;place-items:center;font:700 .8rem/1 var(--font-display)}
+.traps b{color:var(--ink)}
+.scen-body > :last-child{margin-bottom:0}
+
+/* ---------- archive ---------- */
+.inout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}
+.inout > div{padding:16px 18px;border-radius:var(--radius-m);border:1px solid var(--line);background:var(--surface)}
+.inout h4{margin:0 0 10px;font-size:.98rem;display:flex;align-items:center;gap:8px}
+.inout .yes h4{color:var(--safe)}
+.inout .no h4{color:var(--danger)}
+.inout ul{margin:0;padding-left:1.1em;font-size:.92rem}
+
+/* ---------- мастер решений ---------- */
+.wiz-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:14px;min-height:28px}
+.wiz-crumbs span{font-size:.8rem;font-weight:600;color:var(--ink-2);background:var(--surface-2);padding:5px 9px;border-radius:7px}
+.wiz-crumbs i{color:var(--ink-3);font-style:normal;font-size:.8rem}
+.wiz-q{font:600 1.15rem/1.35 var(--font-display);letter-spacing:-.01em;margin:0 0 16px}
+.wiz-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.wiz-opt{text-align:left;padding:16px;border-radius:14px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font-size:.98rem;font-weight:600;line-height:1.35;cursor:pointer;transition:border-color .2s,transform .2s}
+.wiz-opt:hover{border-color:var(--accent);transform:translateY(-2px)}
+.wiz-opt small{display:block;font-weight:500;font-size:.84rem;color:var(--ink-3);margin-top:5px}
+.wiz-res-h{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px}
+.wiz-res-h .wiz-q{margin:0;font:600 1.2rem/1.3 var(--font-mono);letter-spacing:0;color:var(--accent)}
+.wiz-res p{margin:0 0 12px;color:var(--ink-2)}
+.wiz-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.wiz-anim{animation:wizin .35s ease}
+@keyframes wizin{from{opacity:0;transform:translateY(8px)}}
+.tree{margin:14px 0 0;padding:16px 18px;border-radius:12px;background:var(--paper);border:1px solid var(--line);font:500 .8rem/1.65 var(--font-mono);color:var(--ink);overflow-x:auto;white-space:pre}
+.more{margin:14px 0 0}
+.more summary{cursor:pointer;font-weight:600;color:var(--accent);font-size:.92rem;display:inline-flex}
+
+/* ---------- рецепты ---------- */
+.search{display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line-2);background:var(--surface);color:var(--ink-3);margin:20px 0 -8px;transition:border-color .2s}
+.search:focus-within{border-color:var(--accent);color:var(--accent)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--ink);font:inherit;font-size:1rem;padding:13px 0}
+.search input::placeholder{color:var(--ink-3)}
+.search output{font-size:.8rem;font-weight:600;color:var(--ink-3);white-space:nowrap}
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0}
+.steps li{counter-increment:s;position:relative;padding:12px 0 12px 50px;margin:0;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:11px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper);font:600 .82rem/1 var(--font-display)}
+
+/* ---------- практикум ---------- */
+.ex-progress{position:sticky;top:76px;z-index:5;display:flex;align-items:center;gap:14px;margin:22px 0;padding:12px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-float)}
+.ex-bar{flex:1;height:8px;border-radius:8px;background:var(--surface-2);overflow:hidden}
+.ex-bar i{display:block;height:100%;width:0;background:var(--safe);border-radius:8px;transition:width .5s cubic-bezier(.3,1,.4,1)}
+.ex-count{font-weight:600;font-size:.88rem;white-space:nowrap}
+.ex{margin:22px 0;padding:20px 22px 6px;border-radius:var(--radius-l);border:1.5px solid var(--line);background:var(--surface);transition:border-color .35s}
+.ex.done{border-color:var(--safe)}
+.ex-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:6px}
+.ex-head h4{margin:0;font-size:1.08rem}
+.ex-head h4 small{display:block;font-weight:600;font-size:.78rem;color:var(--accent);margin-bottom:3px}
+.ex-check{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;font-size:.86rem;color:var(--ink-2);user-select:none}
+.ex-check input{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border-radius:8px;border:2px solid var(--line-2);background:var(--surface);display:grid;place-items:center;cursor:pointer;transition:background .2s,border-color .2s}
+.ex-check input::after{content:"";width:6px;height:11px;border:solid var(--on-accent);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px) scale(0);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+.ex-check input:checked{background:var(--safe);border-color:var(--safe)}
+.ex-check input:checked::after{transform:rotate(45deg) translate(-1px,-1px) scale(1)}
+.ex.done .ex-check{color:var(--safe)}
+
+/* ---------- вопросы ---------- */
+.qa-tools{display:flex;justify-content:flex-end;margin:0 0 10px}
+.qa{border:1px solid var(--line);border-radius:14px;background:var(--surface);margin:10px 0}
+.qa summary{list-style:none;cursor:pointer;position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;padding:16px 50px 16px 16px;font-weight:600;line-height:1.4}
+.qa summary::-webkit-details-marker{display:none}
+.qn{font:600 .78rem/1.8 var(--font-mono);color:var(--accent)}
+.qa .ans{padding:0 18px 16px 16px;margin-left:calc(2ch + 12px);color:var(--ink-2)}
+.qa .ans p:last-child{margin:0}
+.qa[open]{border-color:var(--accent)}
+
+/* ---------- шпаргалка ---------- */
+.cheat-tools{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
+.cheat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cc{padding:18px 20px;border-radius:var(--radius-m);background:var(--surface);border:1px solid var(--line)}
+.cc.full{grid-column:1/-1}
+.cc.law-c{background:var(--inv-bg);color:var(--inv-ink);border-color:var(--inv-line)}
+.cc.law-c p{margin:0;font:600 1.08rem/1.4 var(--font-display);letter-spacing:-.01em}
+.cc h4{margin:0 0 10px;font-size:.98rem}
+.cc ul{list-style:none;padding:0;margin:0;display:grid;gap:7px}
+.cc li{margin:0;font-size:.9rem;line-height:1.45}
+.cc li code{font-weight:600}
+.cc dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;font-size:.9rem;line-height:1.45}
+.cc dt{font-weight:600}
+.cc dd{margin:0;color:var(--ink-2)}
+
+/* ---------- подвал ---------- */
+.foot{margin-top:72px;padding:28px 0 40px;border-top:1px solid var(--line);color:var(--ink-3);font-size:.88rem;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+.foot a{color:var(--ink-2)}
+
+/* =========================================================
+   АДАПТИВНОСТЬ
+   ========================================================= */
+@media (max-width:1099px){
+  .layout{grid-template-columns:minmax(0,1fr);max-width:860px}
+  .content{max-width:none}
+  .toc-btn{display:inline-flex}
+  .toc{position:fixed;top:0;right:0;bottom:0;z-index:90;width:min(340px,88vw);max-height:none;padding:18px 18px 28px;background:var(--surface);box-shadow:var(--shadow-float);transform:translateX(105%);visibility:hidden;transition:transform .38s cubic-bezier(.2,.8,.2,1),visibility 0s linear .38s}
+  .toc-top{margin-left:0}
+  .toc-close{display:inline-flex}
+  .toc-note{margin-left:0}
+  body.toc-open .toc{transform:none;visibility:visible;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+  .toc-backdrop{display:block;position:fixed;inset:0;z-index:85;background:rgba(10,12,30,.45);opacity:0;pointer-events:none;transition:opacity .3s}
+  body.toc-open .toc-backdrop{opacity:1;pointer-events:auto}
+}
+@media (max-width:900px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .demo{max-width:560px}
+}
+@media (max-width:760px){
+  .zones{grid-template-columns:minmax(0,1fr);gap:0}
+  .zarrows{flex-direction:row;justify-content:center;gap:28px;padding:8px 0}
+  .za{flex-direction:row;gap:6px}
+  .za .ar{width:12px;height:26px}
+  .za .ar::before{left:50%;right:auto;top:3px;bottom:3px;width:2px;height:auto;margin:0 0 0 -1px}
+  .za .ar::after{left:50%;margin-left:-4px}
+  .za.fwd .ar::after{top:auto;bottom:3px;right:auto;transform:rotate(135deg)}
+  .za.back .ar::after{top:3px;margin-top:0;transform:rotate(-45deg)}
+  .stairs{grid-template-columns:minmax(0,1fr);gap:8px}
+  .stairs li{margin-left:calc((var(--h) - 1) * 18px)}
+  .stairs a{height:auto;border-radius:12px;border-top-width:1px;border-left:4px solid var(--accent)}
+  .stairs a code{margin-top:4px}
+  .sim-steps,.sim-zones,.mx-zones{grid-template-columns:minmax(0,1fr)}
+  .stash-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  body{font-size:1rem}
+  .topbar{gap:8px;padding:0 10px 0 14px}
+  .brand-sub{display:none}
+  .bn-full{display:none}
+  .bn-short{display:inline}
+  .brand-mark{width:28px;height:28px}
+  .toc-btn span{display:none}
+  .toc-btn{width:38px;padding:0;justify-content:center}
+  .auto-btn{padding:0 9px}
+  .layout{padding:0 16px}
+  .hero{padding-left:16px;padding-right:16px}
+  .demo-graph{margin:10px 8px 0;--lg-h:124px}
+  .lg{--sz:38px}
+  .term{font-size:.7rem;padding:14px}
+  .sec{padding-top:64px}
+  .sec-head{gap:14px}
+  .sec-node{width:42px;height:42px;font-size:.92rem}
+  .callout{padding:16px 16px 16px 50px}
+  .callout > .ico{left:16px;top:18px}
+  .two,.law-split,.lights,.lr,.vs,.inout,.cheat,.mnemo,.stairs-extra{grid-template-columns:minmax(0,1fr)}
+  .fig{padding:16px}
+  .gpair{grid-template-columns:minmax(0,1fr);gap:4px}
+  .sim-body{padding:16px 14px 18px}
+  .sim-head{padding:12px 14px}
+  pre.sh,pre.out{font-size:.8rem;padding:14px 16px}
+  .ex{padding:16px 16px 4px}
+  .ex-progress{top:72px}
+  .mnemo{padding:14px}
+}
+@media (max-width:380px){
+  .brand-name{font-size:.8rem}
+  .auto-btn{font-size:0;gap:0;width:30px;padding:0;justify-content:center}
+  .auto-btn .ico{width:15px;height:15px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+
+/* =========================================================
+   ПЕЧАТЬ
+   ========================================================= */
+@media print{
+  :root:root:root{
+    --paper:#fff;--surface:#fff;--surface-2:#F1F3F8;--surface-3:#E4E8F2;--ink:#111;--ink-2:#333;--ink-3:#666;--line:#CCD;--line-2:#AAB;
+    --accent:#2E44D6;--accent-soft:#E8EBFF;--on-accent:#fff;--pink:#B0226A;--pink-soft:#FBE2EE;--on-pink:#fff;
+    --safe:#17804D;--safe-soft:#E3F4EA;--warn:#8A5905;--warn-soft:#FBF0D8;--danger:#C62B24;--danger-soft:#FCE6E3;
+    --code-bg:#F4F5FA;--code-bar:#E9ECF5;--code-ink:#111;--code-dim:#555;--code-line:#DDE;
+    --inv-bg:#fff;--inv-ink:#111;--inv-dim:#444;--inv-soft:#F1F3F8;--inv-accent:#2E44D6;--inv-line:#111;--inv-code:#E9ECF5;
+    color-scheme:light;
+  }
+  @page{margin:14mm}
+  body{font-size:10.5pt;background:#fff}
+  .topbar,.toc,.toc-backdrop,.skip,.copy,.demo,.hero-chips,.hero-chips-t,.sim,.qa-tools,.cheat-tools,.ex-progress,.ex-check,.search,.stairs a:hover,.foot{display:none!important}
+  .layout{display:block;max-width:none;padding:0}
+  .hero-wrap::before{display:none}
+  .hero{display:block;padding:0 0 12pt}
+  .sec{padding-top:18pt;break-before:auto}
+  .law,.cc.law-c{border:1.5pt solid #111}
+  .code,pre.sh,pre.out,.tree{border:1px solid #CCD;break-inside:avoid}
+  .t-git{color:#2E44D6}.t-cmd{color:#111}.t-flag{color:#B0226A}.t-str{color:#17804D}.t-ref{color:#8A5905}.t-com,.t-op{color:#666}
+  .o-g{color:#17804D}.o-r{color:#C62B24}.o-y{color:#8A5905}.o-b{color:#111}.o-p{color:#B0226A}
+  .callout,.light,.qa,.scen,.ex,.cc,.fig,.tbl{break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+  body.print-cheat .hero-wrap,body.print-cheat .sec:not(#s12){display:none!important}
+  body.print-cheat #s12{border:0;padding-top:0}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 2.8 19.5a1 1 0 0 0 .9 1.5h16.6a1 1 0 0 0 .9-1.5L12 3.5z"/><path d="M12 10v4.5M12 17.6v.1"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6L12 3z"/><path d="M8.8 12.2l2.2 2.2 4.3-4.4"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><path d="M8.2 3h7.6L21 8.2v7.6L15.8 21H8.2L3 15.8V8.2z"/><path d="M12 8v5M12 16v.1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-replay" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.8-6.3"/><path d="M3.5 4v5h5"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path class="fillme" d="M12 3.5v17a8.5 8.5 0 0 0 0-17z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Перейти к конспекту</a>
+
+<header class="topbar">
+  <a class="brand" href="#top" aria-label="К началу страницы">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path class="bm-line" d="M5 21h22"/>
+      <circle class="bm-node" cx="7" cy="21" r="3.3"/>
+      <circle class="bm-node" cx="16" cy="21" r="3.3"/>
+      <circle class="bm-ghost" cx="25" cy="21" r="3.1"/>
+      <path class="bm-arc" d="M25 14.5c-1.6-6-9.6-6.6-11.4-1.4"/>
+      <path class="bm-arc" d="M11.6 10.6l2 3.2 3.3-1.8"/>
+    </svg>
+    <span class="brand-text">
+      <span class="brand-name"><span class="bn-full">Git: отмена и архивация</span><span class="bn-short">Git: отмена</span></span>
+      <span class="brand-sub">Конспект лекции</span>
+    </span>
+  </a>
+  <span class="topbar-spacer"></span>
+  <button class="toc-btn" id="tocBtn" type="button" aria-controls="toc" aria-expanded="false">
+    <svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg><span>Содержание</span>
+  </button>
+  <div class="theme-ctl">
+    <button class="auto-btn" id="autoBtn" type="button" aria-pressed="true" title="Тема как в системе">
+      <svg class="ico" aria-hidden="true"><use href="#i-auto"/></svg>Авто
+    </button>
+    <button class="lamp" id="lamp" type="button" aria-label="Переключить тему">
+      <span class="lamp-halo" aria-hidden="true"></span>
+      <span class="lamp-cord" aria-hidden="true"></span>
+      <svg class="lamp-bulb" viewBox="0 0 40 52" aria-hidden="true">
+        <g class="rays">
+          <line x1="36.8" y1="26.2" x2="41.7" y2="23.9"/>
+          <line x1="37.9" y1="38.8" x2="43.2" y2="40.2"/>
+          <line x1="30.6" y1="49.2" x2="33.8" y2="53.7"/>
+          <line x1="20" y1="52.5" x2="20" y2="58"/>
+          <line x1="9.4" y1="49.2" x2="6.2" y2="53.7"/>
+          <line x1="2.1" y1="38.8" x2="-3.2" y2="40.2"/>
+          <line x1="3.2" y1="26.2" x2="-1.7" y2="23.9"/>
+        </g>
+        <g class="glass-g">
+          <path class="glass" d="M14 14L26 14C26 17 26.8 18.8 28.6 20.8C31.8 24.3 35 27.8 35 33.5C35 41.8 28.3 48 20 48C11.7 48 5 41.8 5 33.5C5 27.8 8.2 24.3 11.4 20.8C13.2 18.8 14 17 14 14Z"/>
+          <path class="filament" d="M16.5 14.5V24L18 29.5L20 25.5L22 29.5L23.5 24V14.5"/>
+          <path class="shine" d="M10.2 32.5c.2-3 1.6-5.2 3.4-6.8"/>
+        </g>
+        <rect class="cap" x="15.5" y="0" width="9" height="4" rx="1"/>
+        <rect class="cap" x="13.5" y="4.8" width="13" height="3.6" rx="1.2"/>
+        <rect class="cap" x="13.5" y="9.2" width="13" height="3.6" rx="1.2"/>
+      </svg>
+    </button>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<div class="hero-wrap" id="top">
+  <section class="hero" aria-labelledby="h1">
+    <div class="hero-text">
+      <h1 id="h1">Инструменты отмены изменений и&nbsp;архивации в&nbsp;Git</h1>
+      <p class="hero-lead">Как откатить неудачную правку, исправить коммит, спрятать незаконченную работу и вернуть «пропавшие» коммиты. По шагам и без магии: только то, что реально происходит внутри Git.</p>
+      <p class="hero-chips-t">Что разберём</p>
+      <nav class="hero-chips" aria-label="Команды лекции">
+        <a class="chip" href="#step1">git restore</a>
+        <a class="chip" href="#step3a">git commit --amend</a>
+        <a class="chip" href="#step3b">git reset</a>
+        <a class="chip" href="#step4">git revert</a>
+        <a class="chip" href="#clean">git clean</a>
+        <a class="chip" href="#s5">git stash</a>
+        <a class="chip" href="#s6">git reflog</a>
+        <a class="chip" href="#s7">git archive</a>
+      </nav>
+      <p class="hero-need">Нужно заранее знать: add, commit, ветки, merge и rebase на базовом уровне.</p>
+    </div>
+
+    <figure class="demo" id="demo" aria-label="Демонстрация: коммиты пропадают после reset и возвращаются через reflog">
+      <div class="lg demo-graph" style="--n:4" id="demoGraph" aria-hidden="true">
+        <span class="lg-edge" style="--i:0"></span>
+        <span class="lg-edge" style="--i:1"></span>
+        <span class="lg-edge" style="--i:2"></span>
+        <span class="lg-node" style="--i:0">A</span>
+        <span class="lg-node" style="--i:1">B</span>
+        <span class="lg-node" style="--i:2">C</span>
+        <span class="lg-node" style="--i:3">D</span>
+        <span class="lg-ptr" style="--at:3"><span class="lg-tags"><b class="pill branch">main</b><b class="pill head">HEAD</b></span></span>
+      </div>
+      <div class="term" id="demoTerm" aria-hidden="true"></div>
+      <figcaption class="demo-cap">
+        <span id="demoCap">В истории четыре коммита, ветка main указывает на D.</span>
+        <button class="ghost-btn" id="demoReplay" type="button" hidden><svg class="ico" aria-hidden="true"><use href="#i-replay"/></svg>Ещё раз</button>
+      </figcaption>
+    </figure>
+  </section>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="Содержание">
+    <div class="toc-top">
+      <p class="toc-title">Содержание</p>
+      <button class="toc-close" id="tocClose" type="button" aria-label="Закрыть содержание"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="toc-graph">
+      <span class="toc-track" aria-hidden="true"></span>
+      <span class="toc-fill" id="tocFill" aria-hidden="true"></span>
+      <ol class="toc-list" id="tocList">
+        <li><a href="#s0"><span class="toc-dot"></span><span><span class="toc-n">0</span>Главный закон</span></a></li>
+        <li><a href="#s1"><span class="toc-dot"></span><span><span class="toc-n">1</span>Что внутри Git</span></a></li>
+        <li><a href="#s2"><span class="toc-dot"></span><span><span class="toc-n">2</span>Светофор опасности</span></a></li>
+        <li><a href="#s3"><span class="toc-dot"></span><span><span class="toc-n">3</span>Четыре ступени отмены</span></a></li>
+        <li><a href="#s4"><span class="toc-dot"></span><span><span class="toc-n">4</span>reset или revert</span></a></li>
+        <li><a href="#s5"><span class="toc-dot"></span><span><span class="toc-n">5</span>Архивация: stash</span></a></li>
+        <li><a href="#s6"><span class="toc-dot"></span><span><span class="toc-n">6</span>Спасение: reflog</span></a></li>
+        <li><a href="#s7"><span class="toc-dot"></span><span><span class="toc-n">7</span>Бонус: archive</span></a></li>
+        <li><a href="#s8"><span class="toc-dot"></span><span><span class="toc-n">8</span>Рецепты и дерево решений</span></a></li>
+        <li><a href="#s9"><span class="toc-dot"></span><span><span class="toc-n">9</span>Старые и новые команды</span></a></li>
+        <li><a href="#s10"><span class="toc-dot"></span><span><span class="toc-n">10</span>Практикум</span></a></li>
+        <li><a href="#s11"><span class="toc-dot"></span><span><span class="toc-n">11</span>Самопроверка</span></a></li>
+        <li><a href="#s12"><span class="toc-dot"></span><span><span class="toc-n">12</span>Шпаргалка</span></a></li>
+      </ol>
+      <span class="toc-head" id="tocHead" aria-hidden="true">HEAD</span>
+    </div>
+    <p class="toc-note">Метка HEAD показывает, где ты сейчас. Совсем как в Git.</p>
+  </nav>
+  <div class="toc-backdrop" id="tocBackdrop" aria-hidden="true"></div>
+
+  <main class="content" id="main">
+
+<!-- ================================================= 0 -->
+<section class="sec" id="s0" aria-labelledby="h-s0">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">0</span>
+    <div>
+      <h2 id="h-s0">Главный закон: почему Git не&nbsp;страшный</h2>
+      <p class="sec-sub">Кажется, что одна неверная команда в Git уничтожит работу. На деле Git почти ничего не удаляет сразу.</p>
+    </div>
+  </div>
+
+  <div class="law">
+    <p class="law-text">Всё, что хоть раз было закоммичено, почти невозможно потерять. Хрупко только то, что ты ещё ни разу не закоммитил.</p>
+    <div class="law-split">
+      <div class="law-half">
+        <b><span class="law-node solid" aria-hidden="true"></span>Закоммичено — спасаемо</b>
+        <p>Коммиты, даже «удалённые», продолжают храниться в папке <code>.git</code>. По умолчанию это не меньше 30 дней, и их можно найти (раздел 6).</p>
+      </div>
+      <div class="law-half">
+        <b><span class="law-node dashed" aria-hidden="true"></span>Не закоммичено — хрупко</b>
+        <p>Изменения, которые ты ни разу не закоммитил и не спрятал в stash, Git просто не сохранял. Их вернуть нельзя.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Три вопроса перед любой отменой</h3>
+  <ol class="qlist">
+    <li><div><b>Где сейчас то, что я хочу отменить?</b><span>Только в файлах? Уже добавлено через <code>git add</code>? Уже в коммите?</span></div></li>
+    <li><div><b>Я уже сделал push?</b><span>То есть есть ли это у других людей?</span></div></li>
+    <li><div><b>Выбросить или отложить?</b><span>Это больше не нужно — или нужно, но не сейчас?</span></div></li>
+  </ol>
+  <p>Ответы на эти три вопроса однозначно выбирают команду. В <a href="#s8">разделе 8</a> они собраны в интерактивное дерево решений.</p>
+</section>
+
+<!-- ================================================= 1 -->
+<section class="sec" id="s1" aria-labelledby="h-s1">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">1</span>
+    <div>
+      <h2 id="h-s1">Что реально есть внутри Git</h2>
+      <p class="sec-sub">Чтобы отменять, нужно понимать, где лежат изменения. Здесь только настоящие файлы и папки, которые можно открыть и проверить.</p>
+    </div>
+  </div>
+
+  <h3>Три места, где хранятся версии файлов</h3>
+  <figure class="fig">
+    <div class="zones">
+      <div class="zone">
+        <div class="zone-name">Рабочая папка</div>
+        <span class="zone-where">папка проекта</span>
+        <p>Обычные файлы на диске. Их ты видишь и редактируешь в редакторе.</p>
+      </div>
+      <div class="zarrows" aria-hidden="true">
+        <span class="za fwd"><span>git add</span><span class="ar"></span></span>
+        <span class="za back"><span class="ar"></span><span>git restore</span></span>
+      </div>
+      <div class="zone">
+        <div class="zone-name">Индекс</div>
+        <span class="zone-where">.git/index</span>
+        <p>Черновик следующего коммита: какими будут все файлы, если сейчас сделать commit.</p>
+      </div>
+      <div class="zarrows" aria-hidden="true">
+        <span class="za fwd"><span>git commit</span><span class="ar"></span></span>
+        <span class="za back"><span class="ar"></span><span>git restore --staged</span></span>
+      </div>
+      <div class="zone">
+        <div class="zone-name">Репозиторий</div>
+        <span class="zone-where">.git/objects</span>
+        <p>База данных коммитов. Каждый коммит — неизменяемый снимок проекта.</p>
+      </div>
+    </div>
+    <div class="zreset"><code>git reset</code><span>переписывает хэш в файле ветки и, в зависимости от режима, копирует этот коммит в индекс и рабочую папку.</span></div>
+    <figcaption>Вперёд, к коммиту, данные переносят <code>add</code> и <code>commit</code>. Назад, к рабочей папке, их копируют <code>restore</code> и <code>reset</code>.</figcaption>
+  </figure>
+
+  <h4>1. Рабочая папка (working directory)</h4>
+  <p>Обычные файлы проекта на диске. Их ты видишь и редактируешь в редакторе.</p>
+
+  <h4>2. Индекс (staging area)</h4>
+  <p>Черновик следующего коммита. Физически это файл <code>.git/index</code>.</p>
+  <ul>
+    <li>В индексе записано, какими будут все файлы в следующем коммите.</li>
+    <li><code>git add файл</code> копирует текущую версию файла из рабочей папки в индекс.</li>
+    <li>Сразу после коммита индекс полностью совпадает с последним коммитом.</li>
+  </ul>
+
+  <h4>3. Репозиторий</h4>
+  <p>База данных коммитов внутри папки <code>.git</code>. Коммит — это:</p>
+  <ul>
+    <li>полный снимок всех отслеживаемых файлов;</li>
+    <li>автор, дата и сообщение;</li>
+    <li>ссылка на предыдущий коммит (родителя);</li>
+    <li>уникальный хэш, например <code>3f2a1bc</code>.</li>
+  </ul>
+  <div class="callout rule">
+    <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+    <span class="callout-t">Коммит нельзя изменить</span>
+    <p>Любое «исправление» коммита на самом деле создаёт новый коммит с новым хэшем.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Два указателя: ветка и HEAD</h3>
+    <p><strong>Ветка</strong> — это просто текстовый файл, в котором записан хэш одного коммита. Например, ветка <code>main</code> — это файл <code>.git/refs/heads/main</code>. Когда ты делаешь коммит, Git записывает в этот файл хэш нового коммита. Так ветка «растёт».</p>
+    <p><strong>HEAD</strong> — файл <code>.git/HEAD</code>. В нём записано, на какой ветке ты сейчас находишься.</p>
+    <figure class="fig">
+      <div class="chain">
+        <div class="file"><div class="file-name">.git/HEAD</div><div class="file-body">ref: refs/heads/main</div></div>
+        <span class="chain-arrow" aria-hidden="true"><svg class="ico"><use href="#i-arrow"/></svg></span>
+        <div class="file"><div class="file-name">.git/refs/heads/main</div><div class="file-body">3f2a1bc9d8e7…</div></div>
+        <span class="chain-arrow" aria-hidden="true"><svg class="ico"><use href="#i-arrow"/></svg></span>
+        <span class="cnode">коммит 3f2a1bc</span>
+      </div>
+      <figcaption>HEAD указывает на ветку, ветка указывает на коммит. Больше ничего нет.</figcaption>
+    </figure>
+    <p>Проверь сам в любом репозитории:</p>
+<pre class="sh">cat .git/HEAD              # ref: refs/heads/main   ← ты на ветке main
+cat .git/refs/heads/main   # 3f2a1bc9d8e7...        ← хэш последнего коммита main</pre>
+    <p class="muted">В старых репозиториях ветки иногда хранятся в общем файле <code>.git/packed-refs</code>, но смысл тот же: ветка = имя + хэш.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Почему это важно для отмены</h3>
+    <p>Почти каждая команда отмены делает одно из двух:</p>
+    <div class="two">
+      <div>
+        <h4><span class="num">1</span>Копирует версию файла</h4>
+        <p>Из одного места в другое: коммит → индекс → рабочая папка.</p>
+      </div>
+      <div>
+        <h4><span class="num">2</span>Переписывает хэш</h4>
+        <p>В файле ветки: ветка начинает указывать на другой коммит.</p>
+      </div>
+    </div>
+    <p>Никакой магии, только эти две операции. Схема выше показывает их все.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Untracked-файлы</h3>
+    <p>Untracked-файлы — это файлы в рабочей папке, которых нет ни в индексе, ни в последнем коммите. Например, новый файл, который ты ни разу не добавлял. Git о них ничего не знает. Поэтому <code>restore</code> и <code>reset</code> их <strong>не трогают</strong>, для них есть отдельная команда <a href="#clean"><code>git clean</code></a>.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Команды этой лекции одной таблицей</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Команда</th><th>Что она реально делает</th></tr></thead>
+        <tbody>
+          <tr><td><code>git restore файл</code></td><td>Копирует версию файла из индекса в рабочую папку</td></tr>
+          <tr><td><code>git restore --staged файл</code></td><td>Копирует версию файла из последнего коммита в индекс</td></tr>
+          <tr><td><code>git commit --amend</code></td><td>Создаёт новый коммит вместо последнего и записывает его хэш в ветку</td></tr>
+          <tr><td><code>git reset</code></td><td>Записывает в файл ветки хэш другого коммита, а по режиму ещё обновляет индекс и рабочую папку</td></tr>
+          <tr><td><code>git revert</code></td><td>Создаёт новый коммит с обратными изменениями</td></tr>
+          <tr><td><code>git clean</code></td><td>Удаляет untracked-файлы с диска</td></tr>
+          <tr><td><code>git stash</code></td><td>Сохраняет незакоммиченные изменения в специальный коммит вне веток и очищает индекс и рабочую папку</td></tr>
+          <tr><td><code>git reflog</code></td><td>Показывает журнал всех перемещений HEAD и веток</td></tr>
+          <tr><td><code>git archive</code></td><td>Создаёт zip или tar с файлами выбранного коммита</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3><code>git status</code> сам подсказывает команды отмены</h3>
+    <p>Строчки в скобках — готовые подсказки. Мало кто их читает, а зря:</p>
+<pre class="out" data-label="Что покажет git status">On branch main
+Changes to be committed:
+  <span class="o-y">(use "git restore --staged &lt;file&gt;..." to unstage)</span>
+        <span class="o-g">modified:   index.html</span>
+
+Changes not staged for commit:
+  <span class="o-y">(use "git add &lt;file&gt;..." to update what will be committed)</span>
+  <span class="o-y">(use "git restore &lt;file&gt;..." to discard changes in working directory)</span>
+        <span class="o-r">modified:   style.css</span>
+
+Untracked files:
+  <span class="o-y">(use "git add &lt;file&gt;..." to include in what will be committed)</span>
+        <span class="o-r">notes.txt</span></pre>
+    <p>Три блока означают три разные вещи:</p>
+    <ul>
+      <li><strong>Changes to be committed</strong> (зелёные) — индекс отличается от последнего коммита. Это попадёт в следующий коммит.</li>
+      <li><strong>Changes not staged</strong> (красные) — рабочая папка отличается от индекса. Это ты изменил, но не добавил.</li>
+      <li><strong>Untracked files</strong> — файлы, которых Git не знает.</li>
+    </ul>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="callout-t">Правило паники №1</span>
+      <p>Растерялся — набери <code>git status</code> и прочитай, что написано в скобках.</p>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Как указывать на коммиты</h3>
+    <figure class="fig">
+      <div class="graph" data-graph='{"n":[["A",0,0,"","HEAD~3"],["B",1,0,"","HEAD~2"],["C",2,0,"","HEAD~1"],["D",3,0,"hl","HEAD"]],"e":[["A","B"],["B","C"],["C","D"]],"t":[["D","main","branch"]]}'></div>
+      <figcaption>Каждый шаг тильды — на одного родителя назад по истории.</figcaption>
+    </figure>
+    <ul>
+      <li><code>HEAD</code> — коммит, где ты сейчас.</li>
+      <li><code>HEAD~1</code> (или <code>HEAD~</code>) — его родитель, на один коммит назад.</li>
+      <li><code>HEAD~3</code> — на три коммита назад.</li>
+      <li><code>a1b2c3d</code> — короткий хэш, первые 7 символов из <code>git log --oneline</code>.</li>
+      <li><code>HEAD^</code> тоже означает родителя, но в Windows (cmd) символ <code>^</code> особый, поэтому надёжнее <code>~</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================================================= 2 -->
+<section class="sec" id="s2" aria-labelledby="h-s2">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">2</span>
+    <div>
+      <h2 id="h-s2">Светофор опасности</h2>
+      <p class="sec-sub">Каждая команда в конспекте помечена цветом. Цвет говорит, можно ли потом отменить саму отмену.</p>
+    </div>
+  </div>
+
+  <div class="lights">
+    <div class="light safe">
+      <div class="light-lamp" aria-hidden="true"></div>
+      <h3>Безопасно</h3>
+      <p>Ничего не теряется.</p>
+      <ul>
+        <li><code>git restore --staged</code></li>
+        <li><code>git reset --soft</code>, <code>git reset</code> (mixed)</li>
+        <li><code>git revert</code>, <code>git stash</code></li>
+        <li><code>git commit --amend</code><span>до push</span></li>
+        <li><code>git merge --abort</code>, <code>git rebase --abort</code></li>
+      </ul>
+    </div>
+    <div class="light warn">
+      <div class="light-lamp" aria-hidden="true"></div>
+      <h3>Осторожно</h3>
+      <p>Думай перед нажатием.</p>
+      <ul>
+        <li><code>git reset --hard</code><span>коммиты вернёт reflog, а незакоммиченные правки — нет</span></li>
+        <li><code>git stash drop</code>, <code>git stash clear</code><span>вернуть можно, но сложно</span></li>
+        <li><code>amend</code>, <code>reset</code>, <code>push --force</code> после push<span>ломают историю коллегам</span></li>
+      </ul>
+    </div>
+    <div class="light danger">
+      <div class="light-lamp" aria-hidden="true"></div>
+      <h3>Необратимо</h3>
+      <p>Данные исчезнут навсегда.</p>
+      <ul>
+        <li><code>git restore &lt;файл&gt;</code><span>если в нём есть незакоммиченные правки</span></li>
+        <li><code>git clean -f</code></li>
+        <li><code>git reset --hard</code><span>если есть незакоммиченные изменения</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <svg class="ico" aria-hidden="true"><use href="#i-stop"/></svg>
+    <span class="callout-t">Закон красного цвета</span>
+    <p>Всё красное уничтожает <strong>незакоммиченное</strong>. Git этих данных не сохранял, поэтому и вернуть не может. Перед красной командой сделай <code>git stash</code> или коммит, и она станет безопасной.</p>
+  </div>
+</section>
+
+<!-- ================================================= 3 -->
+<section class="sec" id="s3" aria-labelledby="h-s3">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">3</span>
+    <div>
+      <h2 id="h-s3">Отмена изменений: четыре ступени</h2>
+      <p class="sec-sub">Чем дальше ушло изменение, тем выше ступень и тем другой инструмент нужен. Нажми на ступень, чтобы перейти к ней.</p>
+    </div>
+  </div>
+
+  <ol class="stairs">
+    <li style="--h:1"><a href="#step1"><span class="st-n">Ступень 1</span><span class="st-s">Просто изменил файл</span><code>git restore</code></a></li>
+    <li style="--h:2"><a href="#step2"><span class="st-n">Ступень 2</span><span class="st-s">Сделал git add</span><code>git restore --staged</code></a></li>
+    <li style="--h:3"><a href="#step3a"><span class="st-n">Ступень 3</span><span class="st-s">Закоммитил, но не пушил</span><code>--amend / reset</code></a></li>
+    <li style="--h:4"><a href="#step4"><span class="st-n">Ступень 4</span><span class="st-s">Запушил</span><code>git revert</code></a></li>
+  </ol>
+  <div class="stairs-extra">
+    <a href="#clean"><span>Отдельно: новые (untracked) файлы</span><code>git clean</code></a>
+    <a href="#abort"><span>Отдельно: застрял посреди merge или rebase</span><code>--abort</code></a>
+  </div>
+
+  <!-- ---------- Ступень 1 ---------- -->
+  <article class="cmd" id="step1">
+    <div class="cmd-top"><span class="cmd-step">Ступень 1</span><span class="badge danger">необратимо</span></div>
+    <h3><code>git restore &lt;файл&gt;</code><span class="h3d">Вернуть файл</span></h3>
+    <p><span class="lbl">Ситуация.</span> Наредактировал файл, всё сломал и хочешь вернуть как было. <code>git add</code> ещё не делал.</p>
+<pre class="sh">git diff style.css        # сначала посмотри, ЧТО именно сотрёшь
+git restore style.css     # вернуть один файл
+git restore .             # вернуть все изменённые файлы в текущей папке</pre>
+    <p><span class="lbl">Что происходит.</span> Git берёт версию файла из индекса и записывает её поверх файла в рабочей папке. Если ты не делал <code>git add</code>, в индексе лежит версия из последнего коммита, к ней файл и вернётся.</p>
+    <div class="callout danger">
+      <svg class="ico" aria-hidden="true"><use href="#i-stop"/></svg>
+      <span class="callout-t">Опасность</span>
+      <p>Правки исчезают навсегда. Они не попадают ни в корзину, ни в reflog. Если файл ещё открыт в редакторе, иногда спасает Ctrl+Z.</p>
+    </div>
+    <h4>Нюансы</h4>
+    <ul class="nuance">
+      <li>Новые (untracked) файлы <code>restore</code> не трогает.</li>
+      <li>Если ты сделал <code>add</code>, а потом поменял файл ещё раз, <code>git restore файл</code> вернёт его к версии из индекса, а не из коммита.</li>
+      <li>Чтобы вернуть файл сразу к последнему коммиту и в индексе, и в рабочей папке: <code>git restore -SW файл</code> (сокращение от <code>--staged --worktree</code>).</li>
+    </ul>
+    <p class="oldsyn">Старый синтаксис из статей: <code>git checkout -- style.css</code></p>
+  </article>
+
+  <!-- ---------- Ступень 2 ---------- -->
+  <article class="cmd" id="step2">
+    <div class="cmd-top"><span class="cmd-step">Ступень 2</span><span class="badge safe">безопасно</span></div>
+    <h3><code>git restore --staged &lt;файл&gt;</code><span class="h3d">Убрать из индекса</span></h3>
+    <p><span class="lbl">Ситуация.</span> Сделал <code>git add .</code>, а туда попал лишний файл (<code>debug.log</code>, <code>config.local</code>).</p>
+<pre class="sh">git restore --staged debug.log   # убрать один файл из индекса
+git restore --staged .           # убрать из индекса всё</pre>
+    <p><span class="lbl">Что происходит.</span> Git записывает в индекс версию файла из последнего коммита. Рабочая папка не меняется, твои правки остаются на месте. Файл просто перестаёт быть «подготовленным к коммиту».</p>
+    <div class="callout tip">
+      <svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="callout-t">Совет</span>
+      <p>Если файл вообще никогда не должен попадать в коммит, добавь его в <code>.gitignore</code>.</p>
+    </div>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Как запомнить</span>
+      <p><code>restore</code> без флага меняет рабочую папку, с флагом <code>--staged</code> меняет индекс. Флаг прямо называет, какое место меняем.</p>
+    </div>
+    <p class="oldsyn">Старый синтаксис: <code>git reset HEAD debug.log</code> или просто <code>git reset debug.log</code></p>
+  </article>
+
+  <!-- ---------- Ступень 3а ---------- -->
+  <article class="cmd" id="step3a">
+    <div class="cmd-top"><span class="cmd-step">Ступень 3</span><span class="badge safe">безопасно до push</span></div>
+    <h3><code>git commit --amend</code><span class="h3d">Исправить последний коммит</span></h3>
+    <p><span class="lbl">Ситуация 1.</span> Опечатка в сообщении последнего коммита.</p>
+<pre class="sh">git commit --amend -m "Исправленное сообщение"</pre>
+    <p><span class="lbl">Ситуация 2.</span> Забыл добавить файл в последний коммит.</p>
+<pre class="sh">git add forgotten.js
+git commit --amend --no-edit     # --no-edit: сообщение оставить прежним</pre>
+    <p><span class="lbl">Что происходит.</span> Коммит нельзя изменить, поэтому Git создаёт <strong>новый</strong> коммит:</p>
+    <ul>
+      <li>его содержимое берётся из текущего индекса;</li>
+      <li>его родитель — тот же, что у старого коммита;</li>
+      <li>его хэш записывается в файл ветки.</li>
+    </ul>
+    <p>Старый коммит не удаляется. Он просто больше не входит в ветку, а reflog его помнит.</p>
+    <figure class="fig">
+      <div class="gpair"><span class="gpair-l">до</span><div class="graph" data-graph='{"n":[["A",0,0],["B",1,0],["C",2,0]],"e":[["A","B"],["B","C"]],"t":[["C","main","branch"]]}'></div></div>
+      <div class="gpair"><span class="gpair-l">после</span><div class="graph" data-graph='{"n":[["A",0,0],["B",1,0],["C′",2,0,"new"],["C",2,1,"ghost"]],"e":[["A","B"],["B","C′"],["B","C",1]],"t":[["C′","main","branch"],["C","не входит в ветку, но хранится и есть в reflog","note"]]}'></div></div>
+      <figcaption>C′ — новый коммит с новым хэшем. Старый C никуда не делся.</figcaption>
+    </figure>
+    <div class="callout warn">
+      <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+      <span class="callout-t">Ограничения</span>
+      <p>Только последний коммит и только если ты его ещё не пушил. Иначе твоя история разойдётся с серверной (<a href="#s4">раздел 4</a>).</p>
+    </div>
+  </article>
+
+  <!-- ---------- Ступень 3б ---------- -->
+  <article class="cmd" id="step3b">
+    <div class="cmd-top"><span class="cmd-step">Ступень 3</span><span class="badge safe">--soft, --mixed</span><span class="badge warn">--hard</span></div>
+    <h3><code>git reset</code><span class="h3d">Перенести ветку назад</span></h3>
+    <p class="lead">Это главная и самая пугающая команда. На самом деле она устроена просто.</p>
+    <p><strong><code>git reset &lt;коммит&gt;</code> выполняет до трёх шагов по порядку:</strong></p>
+    <ol class="steps">
+      <li><strong>Записывает хэш указанного коммита в файл текущей ветки.</strong> Ветка теперь указывает на более старый коммит. Все режимы делают этот шаг.</li>
+      <li><strong>Копирует содержимое этого коммита в индекс.</strong> Этот шаг делают <code>--mixed</code> и <code>--hard</code>.</li>
+      <li><strong>Копирует содержимое этого коммита в рабочую папку.</strong> Этот шаг делает только <code>--hard</code>.</li>
+    </ol>
+    <p><code>--soft</code> останавливается после шага 1, <code>--mixed</code> — после шага 2, <code>--hard</code> делает все три.</p>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Мнемоника «1-2-3»</span>
+      <p>soft меняет <strong>одно</strong> место (ветку), mixed — <strong>два</strong> (ветку и индекс), hard — <strong>все три</strong>.</p>
+    </div>
+
+    <div class="sim" id="resetSim">
+      <div class="sim-head">
+        <div class="sim-title">Тренажёр: три режима reset <span class="sim-tag">нажми на режим</span></div>
+        <div class="seg" role="radiogroup" aria-label="Режим reset">
+          <button type="button" role="radio" aria-checked="false" data-mode="soft">--soft</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="mixed">--mixed</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="hard">--hard</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <p class="sim-hint">В истории четыре коммита. Каждый добавляет в файл <code>app.txt</code> одну строку. Выбери режим и посмотри, что сделает <code>git reset HEAD~2</code>.</p>
+        <div class="cmdline"><span class="pr">$</span><span id="rsCmd">git reset HEAD~2</span></div>
+        <div class="lg" style="--n:4;--lg-h:118px;--top:22px" id="rsGraph" aria-hidden="true">
+          <span class="lg-edge" style="--i:0"></span>
+          <span class="lg-edge" style="--i:1"></span>
+          <span class="lg-edge" style="--i:2"></span>
+          <span class="lg-node" style="--i:0">A</span>
+          <span class="lg-node" style="--i:1">B</span>
+          <span class="lg-node" style="--i:2">C</span>
+          <span class="lg-node" style="--i:3">D</span>
+          <span class="lg-ptr" style="--at:3"><span class="lg-tags"><b class="pill branch">main</b><b class="pill head">HEAD</b></span></span>
+        </div>
+        <div class="sim-steps">
+          <div class="sstep" data-step="1"><span class="num">1</span><span>Ветка main → коммит B</span></div>
+          <div class="sstep" data-step="2"><span class="num">2</span><span>Индекс ← содержимое B</span></div>
+          <div class="sstep" data-step="3"><span class="num">3</span><span>Рабочая папка ← содержимое B</span></div>
+        </div>
+        <div class="sim-zones">
+          <div class="szone" data-z="branch"><div class="szone-h">Ветка main</div><div class="szone-s"></div>
+            <ul><li data-l="A">строка A</li><li data-l="B">строка B</li><li data-l="C">строка C</li><li data-l="D">строка D</li></ul></div>
+          <div class="szone" data-z="index"><div class="szone-h">Индекс</div><div class="szone-s"></div>
+            <ul><li data-l="A">строка A</li><li data-l="B">строка B</li><li data-l="C">строка C</li><li data-l="D">строка D</li></ul></div>
+          <div class="szone" data-z="work"><div class="szone-h">Рабочая папка</div><div class="szone-s"></div>
+            <ul><li data-l="A">строка A</li><li data-l="B">строка B</li><li data-l="C">строка C</li><li data-l="D">строка D</li></ul></div>
+        </div>
+        <p class="sim-explain" id="rsExplain">Выбери режим вверху справа.</p>
+        <div class="sim-foot">
+          <div class="sim-status"><pre class="out" id="rsStatus" data-label="Что покажет git status"></pre></div>
+        </div>
+        <div class="sim-foot"><button class="ghost-btn" id="rsBack" type="button"><svg class="ico" aria-hidden="true"><use href="#i-replay"/></svg>Вернуть как было</button></div>
+      </div>
+    </div>
+
+    <h4>Что станет с изменениями из C и D</h4>
+    <div class="tbl wide">
+      <table>
+        <thead><tr><th>Режим</th><th>Ветка</th><th>Индекс</th><th>Рабочая папка</th><th>Что покажет <code>git status</code></th></tr></thead>
+        <tbody>
+          <tr><td><code>--soft</code></td><td class="chg">→ B</td><td>остался как в D</td><td>осталась как в D</td><td>Изменения C и D — зелёные (в индексе), можно сразу коммитить</td></tr>
+          <tr><td><code>--mixed</code><br><span class="n">по умолчанию</span></td><td class="chg">→ B</td><td class="chg">= B</td><td>осталась как в D</td><td>Изменения C и D — красные (не добавлены)</td></tr>
+          <tr><td><code>--hard</code></td><td class="chg">→ B</td><td class="chg">= B</td><td class="del">= B</td><td>Ничего: изменения стёрты</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Почему так:</strong> <code>git status</code> показывает разницу между последним коммитом, индексом и рабочей папкой.</p>
+    <ul>
+      <li>После <code>--soft</code> коммит уже B, а индекс ещё содержит версию D. Разница видна как «подготовленные изменения».</li>
+      <li>После <code>--mixed</code> индекс уже равен B, а рабочая папка ещё содержит D. Разница видна как «неподготовленные изменения».</li>
+      <li>После <code>--hard</code> всё равно B, поэтому разницы нет.</li>
+    </ul>
+
+    <h4>Практические рецепты</h4>
+<pre class="sh"># 1. Отменить последний коммит, но сохранить изменения
+git reset --soft HEAD~1
+
+# 2. Склеить последние 3 коммита в один (частая задача перед push!)
+git reset --soft HEAD~3
+git commit -m "Одно понятное сообщение вместо трёх"
+
+# 3. Выбросить ВСЕ незакоммиченные правки в отслеживаемых файлах
+git reset --hard
+
+# 4. Сделать свою ветку точно как на сервере
+git fetch
+git reset --hard origin/main
+
+# 5. Отменить неудачный merge или rebase (до push)
+git reset --hard ORIG_HEAD</pre>
+    <p>Рецепт 3 — <span class="badge danger">необратимо</span>, рецепты 4 и 5 — <span class="badge warn">осторожно</span>.</p>
+    <p><strong>Что такое <code>ORIG_HEAD</code>.</strong> Перед merge, rebase и reset Git записывает хэш текущего коммита в файл <code>.git/ORIG_HEAD</code>. Поэтому <code>git reset --hard ORIG_HEAD</code> возвращает всё к состоянию до последней такой операции.</p>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Не путай</span>
+      <p><code>git reset &lt;файл&gt;</code> с указанием файла ветку <strong>не двигает</strong>. Он только копирует версию файла из коммита в индекс, то же самое, что <code>git restore --staged</code>.</p>
+    </div>
+    <div class="callout warn">
+      <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+      <span class="callout-t">Главное предупреждение</span>
+      <p><code>reset</code> меняет историю ветки, поэтому применяй его только к коммитам, которые ещё не пушил.</p>
+    </div>
+    <div class="callout tip">
+      <svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="callout-t">Страховка перед <code>--hard</code></span>
+      <p>Сделай <code>git branch backup</code> (ещё одна ветка на текущий коммит) или <code>git stash</code> (сохранить незакоммиченное). Тогда даже <code>--hard</code> станет обратимым.</p>
+    </div>
+  </article>
+
+  <!-- ---------- Ступень 4 ---------- -->
+  <article class="cmd" id="step4">
+    <div class="cmd-top"><span class="cmd-step">Ступень 4</span><span class="badge safe">безопасно</span></div>
+    <h3><code>git revert</code><span class="h3d">Отменить запушенный коммит</span></h3>
+    <p><span class="lbl">Ситуация.</span> Плохой коммит уже запушен, коллеги его скачали.</p>
+    <p><span class="lbl">Почему нельзя reset.</span> У коллег этот коммит уже есть, и их новые коммиты могут на нём основываться. Если убрать его у себя через <code>reset</code>, будет вот что:</p>
+    <ul>
+      <li>твоя история перестанет совпадать с серверной;</li>
+      <li>обычный <code>push</code> отклонят, придётся делать <code>push --force</code>;</li>
+      <li>force перезапишет ветку на сервере;</li>
+      <li>у коллег история разойдётся с серверной, а при неосторожном force можно затереть чужие запушенные коммиты.</li>
+    </ul>
+    <p><span class="lbl">Решение.</span> Ничего не удалять, а <strong>создать новый коммит</strong>, который делает ровно обратное плохому. Строки, которые плохой коммит добавил, новый удаляет, и наоборот. История при этом только растёт.</p>
+    <figure class="fig">
+      <div class="gpair"><span class="gpair-l">до</span><div class="graph" data-graph='{"n":[["A",0,0],["B",1,0],["C",2,0,"bad","плохой"],["D",3,0]],"e":[["A","B"],["B","C"],["C","D"]],"t":[["D","main","branch"]]}'></div></div>
+      <div class="gpair"><span class="gpair-l">после</span><div class="graph" data-graph='{"n":[["A",0,0],["B",1,0],["C",2,0,"bad"],["D",3,0],["C′",4,0,"new","Revert \"C\""]],"e":[["A","B"],["B","C"],["C","D"],["D","C′"]],"t":[["C′","main","branch"]]}'></div></div>
+      <figcaption>Команда <code>git revert C</code> добавила коммит C′, который отменяет изменения C. Ничего не удалено.</figcaption>
+    </figure>
+<pre class="sh">git revert HEAD                      # отменить последний коммит
+git revert a1b2c3d                   # отменить любой коммит, даже глубоко в истории
+git revert a1b2c3d --no-edit         # не открывать редактор сообщения
+git revert HEAD~3..HEAD              # отменить три последних (три revert-коммита)
+git revert --no-commit HEAD~3..HEAD  # то же одним коммитом (потом git commit)
+git revert -m 1 &lt;хэш-merge&gt;          # отменить merge-коммит</pre>
+    <h4>Детали</h4>
+    <ul class="nuance">
+      <li><strong>Конфликт при revert</strong> возможен, если после плохого коммита кто-то менял те же строки. Решаешь его как при merge, затем <code>git add</code> и <code>git revert --continue</code>. Или всё отменяешь через <code>git revert --abort</code>.</li>
+      <li><strong>Отмену можно отменить:</strong> <code>git revert</code> на revert-коммит вернёт изменения обратно.</li>
+      <li><strong>Если открылся редактор Vim</strong>, набери <code>:wq</code> и нажми Enter. Или сразу используй <code>--no-edit</code>.</li>
+    </ul>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Как запомнить</span>
+      <p>reset убирает коммиты из истории, revert добавляет в историю коммит-отмену.</p>
+    </div>
+  </article>
+
+  <!-- ---------- clean ---------- -->
+  <article class="cmd" id="clean">
+    <div class="cmd-top"><span class="cmd-step">Отдельно</span><span class="badge danger">необратимо</span></div>
+    <h3><code>git clean</code><span class="h3d">Удалить untracked-файлы</span></h3>
+    <p><code>restore</code> и <code>reset</code> работают только с файлами, которые Git отслеживает. Новые файлы (логи, результаты сборки, случайные черновики) они не трогают. Для них есть <code>clean</code>.</p>
+<pre class="sh">git clean -n        # ПРОСМОТР: показать, что будет удалено (ничего не удаляет)
+git clean -f        # удалить untracked-файлы
+git clean -fd       # + untracked-папки
+git clean -i        # интерактивно: спросит про каждый файл
+git clean -fdx      # + файлы из .gitignore (node_modules, .env!) — очень осторожно</pre>
+    <div class="callout danger">
+      <svg class="ico" aria-hidden="true"><use href="#i-stop"/></svg>
+      <span class="callout-t">Опасность</span>
+      <p>Файлы удаляются с диска мимо корзины. Флаг <code>-x</code> удалит даже твой <code>.env</code> с паролями.</p>
+    </div>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-eye"/></svg>
+      <span class="callout-t">Правило</span>
+      <p>Всегда сначала <code>-n</code> (от «dry run», пробный прогон).</p>
+    </div>
+  </article>
+
+  <!-- ---------- abort ---------- -->
+  <article class="cmd" id="abort">
+    <div class="cmd-top"><span class="cmd-step">Отдельно</span><span class="badge safe">безопасно</span></div>
+    <h3><code>--abort</code><span class="h3d">Выйти из merge и rebase</span></h3>
+    <p>Если посреди merge или rebase посыпались конфликты и хочется вернуться к состоянию до начала:</p>
+<pre class="sh">git merge --abort
+git rebase --abort
+git cherry-pick --abort
+git revert --abort</pre>
+    <div class="callout tip">
+      <svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="callout-t">Совет</span>
+      <p>Начинай merge и rebase с чистым <code>git status</code>, тогда <code>--abort</code> отработает без сюрпризов.</p>
+    </div>
+  </article>
+
+  <!-- ---------- матрица ---------- -->
+  <div class="sub" id="matrix">
+    <h3>Итоговая матрица: какая команда что меняет</h3>
+    <div class="sim" id="mx">
+      <div class="sim-head">
+        <div class="sim-title">Выбери команду <span class="sim-tag">интерактив</span></div>
+      </div>
+      <div class="sim-body">
+        <div class="mx-cmds" id="mxCmds" role="group" aria-label="Команды"></div>
+        <div class="mx-zones" aria-live="polite">
+          <div class="mxz" data-z="0"><div class="mxz-h">Ветка (история)</div><div class="mxz-v"></div><div class="mxz-d"></div></div>
+          <div class="mxz" data-z="1"><div class="mxz-h">Индекс</div><div class="mxz-v"></div><div class="mxz-d"></div></div>
+          <div class="mxz" data-z="2"><div class="mxz-h">Рабочая папка</div><div class="mxz-v"></div><div class="mxz-d"></div></div>
+        </div>
+        <div class="mx-note" id="mxNote"></div>
+      </div>
+    </div>
+    <div class="tbl wide">
+      <table>
+        <thead><tr><th>Команда</th><th>Ветка (история)</th><th>Индекс</th><th>Рабочая папка</th></tr></thead>
+        <tbody>
+          <tr><td><code>git restore файл</code></td><td class="n">—</td><td class="n">—</td><td class="del">↩ перезаписывает из индекса</td></tr>
+          <tr><td><code>git restore --staged файл</code></td><td class="n">—</td><td class="chg">↩ перезаписывает из коммита</td><td class="n">—</td></tr>
+          <tr><td><code>git reset --soft</code></td><td class="chg">↩ переносит</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><code>git reset --mixed</code></td><td class="chg">↩ переносит</td><td class="chg">↩</td><td class="n">—</td></tr>
+          <tr><td><code>git reset --hard</code></td><td class="chg">↩ переносит</td><td class="chg">↩</td><td class="del">↩</td></tr>
+          <tr><td><code>git revert</code></td><td class="chg">➕ новый коммит</td><td>обновляется</td><td>обновляется</td></tr>
+          <tr><td><code>git stash</code></td><td class="n">—</td><td>очищается (изменения сохранены)</td><td>очищается (изменения сохранены)</td></tr>
+          <tr><td><code>git clean</code></td><td class="n">—</td><td class="n">—</td><td class="del">✖ удаляет untracked-файлы</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================= 4 -->
+<section class="sec" id="s4" aria-labelledby="h-s4">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">4</span>
+    <div>
+      <h2 id="h-s4">Золотое правило: <code>reset</code> или <code>revert</code></h2>
+      <p class="sec-sub">Всё решает один вопрос: видел ли кто-то ещё эти коммиты.</p>
+    </div>
+  </div>
+
+  <div class="vs words">
+    <div>
+      <div class="vs-k">Не пушил</div>
+      <p>Можно <code>reset</code> и <code>amend</code>: меняй свою историю как хочешь.</p>
+    </div>
+    <div>
+      <div class="vs-k">Запушил</div>
+      <p>Только <code>revert</code>: историю, которая есть у других, не переписываем.</p>
+    </div>
+  </div>
+
+  <div class="tbl wide">
+    <table>
+      <thead><tr><th></th><th><code>git reset</code></th><th><code>git revert</code></th></tr></thead>
+      <tbody>
+        <tr><td><strong>Что делает</strong></td><td>Переносит ветку на старый коммит</td><td>Добавляет новый коммит с обратными изменениями</td></tr>
+        <tr><td><strong>История</strong></td><td>Переписывается</td><td>Только дополняется</td></tr>
+        <tr><td><strong>След в истории</strong></td><td>Нет</td><td>Есть («Revert …»)</td></tr>
+        <tr><td><strong>После push</strong></td><td class="del">Опасно, нужен force push</td><td class="y">Безопасно</td></tr>
+        <tr><td><strong>Отменить коммит из середины истории</strong></td><td>Нет, только отрезает последние коммиты</td><td class="y">Да</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mnemo" aria-label="Мнемоника">
+    <div class="mnemo-i">
+      <div class="mnemo-w">re<u>S</u>et — для <u>С</u>ебя</div>
+      <p>Переписывает историю. Годится, пока коммиты есть только у тебя.</p>
+    </div>
+    <div class="mnemo-i v">
+      <div class="mnemo-w">re<u>V</u>ert — для <u>В</u>сех</div>
+      <p>Только добавляет коммит. Безопасно для общей истории на сервере.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+    <span class="callout-t">Исключение</span>
+    <p>Если это твоя личная ветка на сервере и в ней никто больше не работает, можно переписать историю (<code>amend</code>, <code>reset</code>, <code>rebase</code>) и отправить её через <code>git push --force-with-lease</code>. Этот вариант force откажется перезаписывать ветку, если на сервере появились чужие коммиты.</p>
+  </div>
+</section>
+
+<!-- ================================================= 5 -->
+<section class="sec" id="s5" aria-labelledby="h-s5">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">5</span>
+    <div>
+      <h2 id="h-s5">Архивация: <code>git stash</code></h2>
+      <p class="sec-sub">Как отложить незаконченную работу, не делая коммит, и потом вернуть её.</p>
+    </div>
+  </div>
+
+  <h3>Зачем</h3>
+  <p>Ты делаешь фичу, полфайла написано, код даже не запускается. И тут: «Срочно почини баг на main!» Коммитить незаконченное не хочется, а переключить ветку Git не даёт:</p>
+<pre class="out"><span class="o-r">error: Your local changes to the following files would be overwritten by checkout:</span>
+        app.js
+<span class="o-y">Please commit your changes or stash them before you switch branches.</span></pre>
+  <p>Git сам подсказывает: <em>«or stash them»</em>.</p>
+
+  <div class="sub">
+    <h3>Что stash делает на самом деле</h3>
+    <ol class="steps">
+      <li>Берёт все незакоммиченные изменения отслеживаемых файлов: и из индекса, и из рабочей папки.</li>
+      <li>Сохраняет их в <strong>специальный коммит, который не принадлежит ни одной ветке</strong>. Ссылка на него хранится в <code>.git/refs/stash</code>.</li>
+      <li>Возвращает индекс и рабочую папку к последнему коммиту. После этого <code>git status</code> чистый.</li>
+    </ol>
+    <p>Потом эти изменения можно применить обратно на любой ветке.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Базовый цикл</h3>
+<pre class="sh">git stash -u -m "форма логина, недоделано"   # спрятать
+git switch main                              # переключиться
+# ... чиним баг, коммитим ...
+git switch feature                           # вернуться
+git stash pop                                # достать обратно</pre>
+  </div>
+
+  <div class="sub">
+    <h3>Список стэшей — это стопка</h3>
+    <p>Новая запись добавляется <strong>сверху</strong> и получает номер 0, а номера остальных увеличиваются на 1:</p>
+<pre class="out"><span class="o-p">$</span> <span class="o-b">git stash list</span>
+<span class="o-y">stash@{0}</span>: On feature: форма логина, недоделано        <span class="o-d">← самый свежий</span>
+<span class="o-y">stash@{1}</span>: WIP on feature: 3f2a1bc Add header
+<span class="o-y">stash@{2}</span>: On main: эксперимент с цветами</pre>
+    <div class="callout warn">
+      <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+      <span class="callout-t">Номера меняются</span>
+      <p>После каждого <code>pop</code>, <code>drop</code> и нового <code>stash</code>. Перед работой с конкретным номером смотри <code>git stash list</code>. Попробуй в тренажёре: удали запись из середины и посмотри, как сдвинутся номера.</p>
+    </div>
+
+    <div class="sim" id="stashSim">
+      <div class="sim-head">
+        <div class="sim-title">Тренажёр: stash <span class="sim-tag">нажимай команды</span></div>
+        <button class="ghost-btn" id="stReset" type="button"><svg class="ico" aria-hidden="true"><use href="#i-replay"/></svg>Сначала</button>
+      </div>
+      <div class="sim-body">
+        <p class="sim-hint">Кликни по записи в списке, чтобы выбрать её номер. Команды <code>apply</code>, <code>pop</code> и <code>drop</code> работают с выбранной записью.</p>
+        <div class="stash-actions">
+          <button class="act soft" type="button" data-act="edit"><svg class="ico" aria-hidden="true"><use href="#i-edit"/></svg>Изменить файл</button>
+          <button class="act main" type="button" data-act="push">git stash</button>
+          <button class="act" type="button" data-act="apply">apply</button>
+          <button class="act" type="button" data-act="pop">pop</button>
+          <button class="act" type="button" data-act="drop">drop</button>
+        </div>
+        <div class="cmdline"><span class="pr">$</span><span id="stCmd">git stash list</span></div>
+        <div class="stash-grid" style="margin-top:14px">
+          <div>
+            <p class="stash-col-h"><span>git stash list</span><span id="stCount"></span></p>
+            <ol class="stack" id="stStack"></ol>
+          </div>
+          <div>
+            <p class="stash-col-h"><span>Рабочая папка</span></p>
+            <div class="work" id="stWork"></div>
+          </div>
+        </div>
+        <p class="sim-explain" id="stLog" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Все команды</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Команда</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td><code>git stash</code><br><span class="n">= <code>git stash push</code></span></td><td>Спрятать изменения отслеживаемых файлов</td></tr>
+          <tr><td><code>git stash push -m "текст"</code></td><td>То же, с подписью</td></tr>
+          <tr><td><code>git stash -u</code></td><td>Спрятать ещё и untracked-файлы (<strong>u</strong> = untracked)</td></tr>
+          <tr><td><code>git stash -a</code></td><td>Спрятать даже игнорируемые файлы (<strong>a</strong> = all)</td></tr>
+          <tr><td><code>git stash list</code></td><td>Показать список</td></tr>
+          <tr><td><code>git stash show -p stash@{1}</code></td><td>Показать содержимое в виде diff (<strong>p</strong> = patch)</td></tr>
+          <tr><td><code>git stash apply stash@{1}</code></td><td>Применить изменения, запись остаётся в списке</td></tr>
+          <tr><td><code>git stash drop stash@{1}</code></td><td>Удалить запись <span class="badge warn">осторожно</span></td></tr>
+          <tr><td><code>git stash pop</code></td><td>Применить верхнюю запись и удалить её</td></tr>
+          <tr><td><code>git stash clear</code></td><td>Удалить все записи <span class="badge warn">осторожно</span></td></tr>
+          <tr><td><code>git stash branch имя</code></td><td>Создать ветку и применить стэш в ней</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Главная формула</span>
+      <p><code>pop</code> = <code>apply</code> + <code>drop</code></p>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Пять ловушек</h3>
+    <div class="traps">
+      <div><b>Новые файлы без <code>-u</code> не прячутся.</b> Классика: сделал <code>git stash</code>, переключил ветку, а новый файл остался в папке. Он untracked, Git его не трогал. Правило: сомневаешься — прячь с <code>-u</code>.</div>
+      <div><b>Подписывай стэши (<code>-m</code>).</b> Через неделю надпись «WIP on feature» ничего тебе не скажет.</div>
+      <div><b>Конфликт при <code>pop</code>.</b> Если после stash ты менял те же строки, будет конфликт, решаешь как обычно. При конфликте <code>pop</code> <strong>не удаляет</strong> запись из списка, чтобы ничего не потерялось. После решения удали её сам: <code>git stash drop</code>.</div>
+      <div><b>Индекс не восстанавливается.</b> <code>pop</code> и <code>apply</code> по умолчанию возвращают изменения, но не восстанавливают, какие из них были в индексе. Если это важно: <code>git stash pop --index</code>.</div>
+      <div><b>Stash — не склад.</b> Он хранится только на твоём компьютере и не пушится. Для долгого хранения делай коммит в отдельную ветку.</div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Продвинутое</h3>
+<pre class="sh">git stash push -m "только стили" -- style.css   # спрятать конкретные файлы
+git stash -p                                    # выбрать части изменений интерактивно
+git stash --staged                              # спрятать только то, что в индексе (Git 2.35+)
+git stash --keep-index                          # спрятать всё, но индекс оставить как есть
+git stash branch fix-later stash@{0}            # стэш не применяется из-за конфликтов?
+                                                # создаст ветку от коммита, на котором
+                                                # стэш был сделан, и применит его там
+git pull --autostash                            # сам спрячет и вернёт правки вокруг pull</pre>
+    <div class="callout rule">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span class="callout-t">Для Windows PowerShell</span>
+      <p>Фигурные скобки там особые, поэтому пиши <code>git stash apply "stash@{1}"</code> в кавычках. Или короче: <code>git stash apply 1</code>, ведь просто номер тоже работает.</p>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Альтернатива stash: временный коммит</h3>
+<pre class="sh">git add -A &amp;&amp; git commit -m "WIP"   # сохранить черновик обычным коммитом
+# ... переключился, поработал, вернулся ...
+git reset HEAD~1                    # убрать коммит: изменения снова в рабочей папке</pre>
+  </div>
+</section>
+
+<!-- ================================================= 6 -->
+<section class="sec" id="s6" aria-labelledby="h-s6">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">6</span>
+    <div>
+      <h2 id="h-s6">Спасение: <code>git reflog</code></h2>
+      <p class="sec-sub">Команда, после которой Git перестаёт пугать. Она находит коммиты, которые «пропали».</p>
+    </div>
+  </div>
+
+  <h3>Ситуация</h3>
+  <p>Ты сделал <code>git reset --hard HEAD~3</code>. Три коммита пропали, <code>git log</code> их не показывает.</p>
+
+  <div class="sub">
+    <h3>Почему log их не видит</h3>
+    <p><strong><code>git log</code></strong> идёт от текущего коммита назад по ссылкам на родителей и показывает эту цепочку. Ветка теперь указывает на более старый коммит. Отрезанные коммиты в цепочку от него не входят, поэтому log их не видит. Но сами коммиты по-прежнему хранятся в <code>.git</code>.</p>
+    <p><strong><code>git reflog</code></strong> — это отдельный журнал. Физически это файл <code>.git/logs/HEAD</code>. Каждый раз, когда HEAD меняется, Git дописывает туда строку: какой коммит был, какой стал и какой командой. Это происходит при commit, switch/checkout, reset, merge, rebase, amend, pull и cherry-pick. У каждой ветки есть свой такой журнал: <code>.git/logs/refs/heads/main</code>.</p>
+    <div class="lr">
+      <div>
+        <h4>git log</h4>
+        <p class="lr-s">История коммитов. Идёт по родителям.</p>
+        <ol>
+          <li><i>3f2a1bc</i>Commit 1</li>
+          <li class="miss">Три отрезанных коммита сюда не попадают</li>
+        </ol>
+      </div>
+      <div>
+        <h4>git reflog</h4>
+        <p class="lr-s">История твоих действий. Помнит всё.</p>
+        <ol>
+          <li><i>3f2a1bc</i>reset: moving to HEAD~3</li>
+          <li><i>9d8e7f6</i>commit: Добавил валидацию формы</li>
+          <li><i>5c4b3a2</i>commit: Сделал форму логина</li>
+          <li><i>1a2b3c4</i>commit: Добавил стили</li>
+        </ol>
+      </div>
+    </div>
+    <p>Итог: <code>git log</code> показывает историю коммитов, <code>git reflog</code> показывает историю твоих действий.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Как читать reflog</h3>
+<pre class="out"><span class="o-p">$</span> <span class="o-b">git reflog</span>
+<span class="o-y">3f2a1bc</span> (HEAD -&gt; main) HEAD@{0}: reset: moving to HEAD~3
+<span class="o-y">9d8e7f6</span> HEAD@{1}: commit: Добавил валидацию формы
+<span class="o-y">5c4b3a2</span> HEAD@{2}: commit: Сделал форму логина
+<span class="o-y">1a2b3c4</span> HEAD@{3}: commit: Добавил стили
+<span class="o-y">3f2a1bc</span> HEAD@{4}: checkout: moving from feature to main</pre>
+    <ul>
+      <li><code>HEAD@{0}</code> — где HEAD сейчас.</li>
+      <li><code>HEAD@{1}</code> — где HEAD был <strong>одно действие назад</strong>. <code>HEAD@{2}</code> — два действия назад, и так далее.</li>
+    </ul>
+
+    <div class="vs">
+      <div>
+        <div class="vs-k">HEAD~1</div>
+        <p>Родитель текущего коммита. Шаг назад <strong>по истории</strong>.</p>
+      </div>
+      <div>
+        <div class="vs-k">HEAD@{1}</div>
+        <p>Где был HEAD до последнего действия. Шаг назад <strong>по журналу reflog</strong>.</p>
+      </div>
+    </div>
+    <p>Это важнейшее различие и частый вопрос на собеседованиях. Проверь себя в тренажёре:</p>
+
+    <div class="sim" id="hx">
+      <div class="sim-head">
+        <div class="sim-title">Тренажёр: куда указывает ссылка</div>
+        <div class="seg" role="radiogroup" aria-label="Ссылка">
+          <button type="button" role="radio" aria-checked="false" data-ref="HEAD">HEAD</button>
+          <button type="button" role="radio" aria-checked="false" data-ref="HEAD~1">HEAD~1</button>
+          <button type="button" role="radio" aria-checked="false" data-ref="HEAD@{1}">HEAD@{1}</button>
+          <button type="button" role="radio" aria-checked="false" data-ref="HEAD@{2}">HEAD@{2}</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <p class="sim-hint">Ты сделал коммиты A, B, C, D, а потом выполнил <code>git reset --hard HEAD~2</code>. Теперь ветка main указывает на B.</p>
+        <div class="lg hx-graph" style="--n:4" id="hxGraph" aria-hidden="true">
+          <span class="lg-edge" style="--i:0"></span>
+          <span class="lg-edge ghost" style="--i:1"></span>
+          <span class="lg-edge ghost" style="--i:2"></span>
+          <span class="lg-node" style="--i:0">A</span>
+          <span class="lg-node" style="--i:1">B</span>
+          <span class="lg-node ghost" style="--i:2">C</span>
+          <span class="lg-node ghost" style="--i:3">D</span>
+          <span class="lg-ptr" style="--at:1"><span class="lg-tags"><b class="pill branch">main</b><b class="pill head">HEAD</b></span></span>
+        </div>
+        <p class="sim-explain" id="hxExplain" aria-live="polite">Выбери ссылку вверху справа.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Спасение</h3>
+<pre class="sh">git show 9d8e7f6               # сначала убедись, что это нужный коммит
+git reset --hard HEAD@{1}      # вернуть ветку туда, где она была до reset
+# или самый безопасный вариант: ничего не трогать, создать ветку на этот коммит
+git branch rescue 9d8e7f6</pre>
+  </div>
+
+  <div class="sub">
+    <h3>Пять сценариев спасения</h3>
+    <details class="scen">
+      <summary><span class="num">1</span>После <code>reset --hard</code></summary>
+      <div class="scen-body"><p>Так, как показано выше: находишь в reflog строку до reset и возвращаешься на неё через <code>git reset --hard HEAD@{n}</code> или создаёшь ветку <code>git branch rescue &lt;хэш&gt;</code>.</p></div>
+    </details>
+    <details class="scen">
+      <summary><span class="num">2</span>Удалил ветку</summary>
+      <div class="scen-body">
+        <p>Удаление ветки — это удаление файла с хэшем. Сами коммиты остаются. Git при удалении печатает этот хэш:</p>
+<pre class="out">Deleted branch feature (was <span class="o-y">7e6d5c4</span>).</pre>
+        <p>Восстановление — создать файл ветки заново: <code>git branch feature 7e6d5c4</code>.</p>
+        <p>Если сообщение уже потерялось, ищи в reflog запись <code>checkout: moving from feature to ...</code>. Строчка под ней (более старая) — последний коммит ветки feature.</p>
+      </div>
+    </details>
+    <details class="scen">
+      <summary><span class="num">3</span>Неудачный rebase</summary>
+      <div class="scen-body">
+        <p>Сразу после rebase поможет <code>git reset --hard ORIG_HEAD</code>. Если после этого ты уже что-то делал, найди в reflog строку <code>rebase (start)</code>. Запись под ней — состояние до rebase:</p>
+<pre class="sh">git reset --hard HEAD@{5}      # номер строки, которая идёт перед rebase (start)</pre>
+      </div>
+    </details>
+    <details class="scen">
+      <summary><span class="num">4</span>Отменить amend</summary>
+      <div class="scen-body">
+<pre class="sh">git reset --soft HEAD@{1}      # ветка вернётся к старому коммиту,
+                               # а добавленное через amend окажется в индексе</pre>
+      </div>
+    </details>
+    <details class="scen">
+      <summary><span class="num">5</span>Коммиты вне веток (detached HEAD)</summary>
+      <div class="scen-body"><p>Если сделать <code>git checkout a1b2c3d</code>, в <code>.git/HEAD</code> записывается хэш коммита, а не имя ветки. Новые коммиты в таком состоянии не попадают ни в одну ветку. Когда ты переключишься на main, на них ничего не будет указывать. Находишь их хэш в reflog и делаешь <code>git branch saved &lt;хэш&gt;</code>.</p></div>
+    </details>
+  </div>
+
+  <div class="sub">
+    <h3>Время вместо номеров</h3>
+<pre class="sh">git reflog --date=relative     # показать «2 hours ago» вместо номеров
+git show main@{yesterday}      # на какой коммит указывал main вчера
+git diff HEAD@{1.hour.ago}     # что изменилось за последний час</pre>
+  </div>
+
+  <div class="sub">
+    <h3>Ограничения</h3>
+    <ul>
+      <li><strong>reflog локальный.</strong> На другом компьютере и в свежем клоне его нет, push его не отправляет.</li>
+      <li><strong>У записей есть срок годности.</strong> По умолчанию записи хранятся около 90 дней. Для коммитов, которые не входят ни в одну ветку, — около 30 дней. Потом очистка (<code>git gc</code>) может удалить и записи, и сами коммиты.</li>
+      <li><strong>reflog знает только о коммитах.</strong> Правки, стёртые через <code>restore</code>, <code>reset --hard</code> или <code>clean</code> до коммита, он не спасёт. Это снова <a href="#s0">главный закон</a>.</li>
+    </ul>
+  </div>
+
+  <div class="sub">
+    <h3>Спасение удалённого стэша</h3>
+    <p class="muted">Для продвинутых.</p>
+    <p>При <code>pop</code> и <code>drop</code> Git печатает строку вида <code>Dropped refs/stash@{0} (6f3e2a1…)</code>. Скопируй хэш и выполни <code>git stash apply 6f3e2a1</code>. Если терминал уже закрыт:</p>
+<pre class="sh">git fsck --no-reflog | grep "dangling commit"   # коммиты, на которые ничего не указывает
+git show &lt;хэш&gt;                                  # ищешь среди них свой стэш</pre>
+  </div>
+</section>
+
+<!-- ================================================= 7 -->
+<section class="sec" id="s7" aria-labelledby="h-s7">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">7</span>
+    <div>
+      <h2 id="h-s7">Бонус: <code>git archive</code></h2>
+      <p class="sec-sub">Архивация в прямом смысле: упаковать файлы проекта в zip или tar.</p>
+    </div>
+  </div>
+<pre class="sh">git archive --format=zip -o project.zip HEAD                        # текущий коммит
+git archive --format=zip -o release-v1.0.zip v1.0                   # по тегу
+git archive --format=tar.gz --prefix=myapp/ -o myapp.tar.gz main    # tar.gz с папкой внутри</pre>
+  <div class="inout">
+    <div class="yes">
+      <h4><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Попадает в архив</h4>
+      <ul><li>Только файлы из выбранного коммита</li></ul>
+    </div>
+    <div class="no">
+      <h4><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Не попадает</h4>
+      <ul><li>Папка <code>.git</code></li><li><code>node_modules</code>, логи и прочие неотслеживаемые файлы</li><li>Незакоммиченные правки</li></ul>
+    </div>
+  </div>
+  <p><strong>Когда полезно:</strong> сдать лабу преподавателю, отправить код заказчику, собрать релиз. Это надёжнее, чем архивировать папку проекта вручную.</p>
+</section>
+
+<!-- ================================================= 8 -->
+<section class="sec" id="s8" aria-labelledby="h-s8">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">8</span>
+    <div>
+      <h2 id="h-s8">Рецепты «Я хочу…» и&nbsp;дерево решений</h2>
+      <p class="sec-sub">Ответь на пару вопросов, и дерево назовёт нужную команду.</p>
+    </div>
+  </div>
+
+  <div class="sim" id="wiz">
+    <div class="sim-head">
+      <div class="sim-title">Что я хочу отменить? <span class="sim-tag">дерево решений</span></div>
+    </div>
+    <div class="sim-body" id="wizBody" aria-live="polite"></div>
+  </div>
+
+  <details class="more">
+    <summary>Показать всё дерево целиком</summary>
+<pre class="tree">Что я хочу отменить?
+│
+├── Правки, которые ещё НЕ закоммичены
+│     ├── выбросить навсегда ............. git restore &lt;файл&gt;          [необратимо]
+│     │                                    (новые файлы: git clean -n → -f)
+│     ├── убрать из индекса .............. git restore --staged &lt;файл&gt; [безопасно]
+│     └── отложить на потом .............. git stash -u                 [безопасно]
+│
+└── Коммиты
+      ├── ещё НЕ запушены
+      │     ├── исправить последний ...... git commit --amend           [безопасно]
+      │     └── убрать последние N ....... git reset --soft / --mixed / --hard HEAD~N
+      ├── УЖЕ запушены ................... git revert &lt;хэш&gt;             [безопасно]
+      └── «пропали» после моих действий .. git reflog                   [безопасно]</pre>
+  </details>
+
+  <div class="sub">
+    <h3>Рецепты</h3>
+    <label class="search">
+      <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+      <span class="vh">Найти рецепт</span>
+      <input type="search" id="recipeSearch" placeholder="Найти ситуацию: ветка, коммит, файл, stash…" autocomplete="off">
+      <output id="recipeCount" for="recipeSearch"></output>
+    </label>
+    <div class="tbl wide">
+      <table id="recipes">
+        <thead><tr><th>Ситуация</th><th>Команда</th><th><span class="vh">Опасность</span></th></tr></thead>
+        <tbody>
+          <tr><td>Испортил файл, <code>add</code> не делал</td><td><code>git restore файл</code></td><td class="c"><span class="dot danger" title="необратимо"></span></td></tr>
+          <tr><td>Добавил лишний файл в индекс</td><td><code>git restore --staged файл</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Выбросить вообще все незакоммиченные правки</td><td><code>git reset --hard</code> (+ <code>git clean -fd</code> для новых файлов)</td><td class="c"><span class="dot danger" title="необратимо"></span></td></tr>
+          <tr><td>Опечатка в сообщении последнего коммита</td><td><code>git commit --amend -m "…"</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Забыл файл в последнем коммите</td><td><code>git add файл</code> → <code>git commit --amend --no-edit</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Отменить последний коммит, сохранив изменения</td><td><code>git reset --soft HEAD~1</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Склеить N последних коммитов</td><td><code>git reset --soft HEAD~N</code> → <code>git commit</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Удалить последний коммит полностью (не пушил)</td><td><code>git reset --hard HEAD~1</code></td><td class="c"><span class="dot warn" title="осторожно"></span></td></tr>
+          <tr><td>Отменить запушенный коммит</td><td><code>git revert хэш</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Начал работу не в той ветке (ещё не коммитил)</td><td><code>git switch -c нужная-ветка</code> (незакоммиченные правки останутся в папке)</td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Закоммитил в main вместо новой ветки (не пушил)</td><td><code>git branch feature</code> → <code>git reset --hard HEAD~1</code> → <code>git switch feature</code></td><td class="c"><span class="dot warn" title="осторожно"></span></td></tr>
+          <tr><td>Срочно переключиться, работа не готова</td><td><code>git stash -u</code> → … → <code>git stash pop</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Застрял в конфликте merge или rebase</td><td><code>git merge --abort</code> / <code>git rebase --abort</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Merge или rebase прошёл, но результат плохой (не пушил)</td><td><code>git reset --hard ORIG_HEAD</code></td><td class="c"><span class="dot warn" title="осторожно"></span></td></tr>
+          <tr><td>Запушенный merge оказался плохим</td><td><code>git revert -m 1 хэш-merge</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>«Потерял» коммиты после reset или rebase</td><td><code>git reflog</code> → <code>git reset --hard HEAD@{n}</code> или <code>git branch rescue хэш</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Удалил ветку</td><td><code>git branch имя хэш</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr><td>Удалить новые мусорные файлы</td><td><code>git clean -n</code> → <code>git clean -fd</code></td><td class="c"><span class="dot danger" title="необратимо"></span></td></tr>
+          <tr><td>Вернуть файл к версии из старого коммита</td><td><code>git restore --source=хэш файл</code></td><td class="c"><span class="dot warn" title="осторожно"></span></td></tr>
+          <tr><td>Сделать ветку точно как на сервере</td><td><code>git fetch</code> → <code>git reset --hard origin/main</code></td><td class="c"><span class="dot warn" title="осторожно"></span></td></tr>
+          <tr><td>Сдать проект архивом</td><td><code>git archive --format=zip -o project.zip HEAD</code></td><td class="c"><span class="dot safe" title="безопасно"></span></td></tr>
+          <tr class="empty" hidden><td colspan="3">Ничего не найдено. Попробуй другое слово, например «коммит» или «файл».</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted"><span class="dot safe"></span> безопасно &nbsp; <span class="dot warn"></span> осторожно &nbsp; <span class="dot danger"></span> необратимо</p>
+  </div>
+
+  <div class="sub">
+    <h3>Алгоритм первой помощи</h3>
+    <ol class="steps">
+      <li><strong>Стоп.</strong> Не вводи ничего с <code>--hard</code>, <code>--force</code> или <code>-f</code>.</li>
+      <li><strong><code>git status</code></strong> — где я и что происходит?</li>
+      <li>Идёт merge или rebase и всё плохо → <strong><code>--abort</code></strong>.</li>
+      <li>Пропали коммиты → <strong><code>git reflog</code></strong>.</li>
+      <li>Перед любой спасательной операцией → <strong><code>git branch backup</code></strong>.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ================================================= 9 -->
+<section class="sec" id="s9" aria-labelledby="h-s9">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">9</span>
+    <div>
+      <h2 id="h-s9">Старые и новые команды</h2>
+      <p class="sec-sub">Словарик для чтения старых статей и ответов на Stack Overflow.</p>
+    </div>
+  </div>
+  <p>В Git 2.23 (2019 год) команду <code>checkout</code>, которая делала слишком много разного, разделили на две: <code>switch</code> для веток и <code>restore</code> для файлов.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Старая команда</th><th>Новый аналог</th></tr></thead>
+      <tbody>
+        <tr><td><code>git checkout -- файл</code></td><td><code>git restore файл</code></td></tr>
+        <tr><td><code>git reset HEAD файл</code></td><td><code>git restore --staged файл</code></td></tr>
+        <tr><td><code>git checkout ветка</code></td><td><code>git switch ветка</code></td></tr>
+        <tr><td><code>git checkout -b новая</code></td><td><code>git switch -c новая</code></td></tr>
+        <tr><td><code>git checkout хэш -- файл</code></td><td><code>git restore --source=хэш -SW файл</code></td></tr>
+        <tr><td><code>git stash save "текст"</code></td><td><code>git stash push -m "текст"</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Старые команды по-прежнему работают, но по названию новых понятнее, что они делают.</p>
+</section>
+
+<!-- ================================================= 10 -->
+<section class="sec" id="s10" aria-labelledby="h-s10">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">10</span>
+    <div>
+      <h2 id="h-s10">Практикум «Сломай и&nbsp;почини»</h2>
+      <p class="sec-sub">Лучший способ перестать бояться — самому сломать и починить. Создай учебный репозиторий и делай всё по шагам.</p>
+    </div>
+  </div>
+  <p>Команды рассчитаны на Git Bash (Windows), терминал macOS или Linux. Основная ветка может называться <code>main</code> или <code>master</code>: смотри вывод <code>git branch</code> и подставляй своё имя. Отмечай выполненные упражнения, отметки сохранятся в этом браузере.</p>
+
+  <div class="ex-progress" aria-live="polite">
+    <div class="ex-bar"><i id="exBar"></i></div>
+    <span class="ex-count" id="exCount">0 из 9</span>
+  </div>
+
+  <div class="ex" data-ex="0">
+    <div class="ex-head"><h4><small>Подготовка</small>Создать песочницу</h4></div>
+<pre class="sh">mkdir git-sandbox &amp;&amp; cd git-sandbox
+git init
+echo "line 1" &gt; app.txt
+git add app.txt &amp;&amp; git commit -m "Commit 1"
+echo "line 2" &gt;&gt; app.txt &amp;&amp; git commit -am "Commit 2"
+echo "line 3" &gt;&gt; app.txt &amp;&amp; git commit -am "Commit 3"
+git log --oneline
+cat .git/HEAD                 # на какой ты ветке
+cat .git/refs/heads/main      # хэш последнего коммита — сравни с git log</pre>
+  </div>
+
+  <div class="ex" data-ex="1">
+    <div class="ex-head"><h4><small>Упражнение 1</small>Откатить изменения в файле</h4><label class="ex-check"><input type="checkbox" data-exc="1">Готово</label></div>
+<pre class="sh">echo "garbage" &gt;&gt; app.txt
+git status               # app.txt красный — modified
+git diff                 # видно, что добавилось
+git restore app.txt
+cat app.txt              # garbage исчез</pre>
+  </div>
+
+  <div class="ex" data-ex="2">
+    <div class="ex-head"><h4><small>Упражнение 2</small>Убрать файл из индекса и удалить untracked-файл</h4><label class="ex-check"><input type="checkbox" data-exc="2">Готово</label></div>
+<pre class="sh">echo "password=123" &gt; secret.txt
+git add .
+git status               # secret.txt зелёный — в индексе
+git restore --staged secret.txt
+git status               # снова untracked
+git clean -n             # Would remove secret.txt
+git clean -f</pre>
+  </div>
+
+  <div class="ex" data-ex="3">
+    <div class="ex-head"><h4><small>Упражнение 3</small>Исправить последний коммит</h4><label class="ex-check"><input type="checkbox" data-exc="3">Готово</label></div>
+<pre class="sh">git log --oneline        # запомни хэш последнего коммита
+git commit --amend -m "Commit 3 (fixed)"
+git log --oneline        # хэш другой — это новый коммит</pre>
+  </div>
+
+  <div class="ex" data-ex="4">
+    <div class="ex-head"><h4><small>Упражнение 4</small>Три режима reset</h4><label class="ex-check"><input type="checkbox" data-exc="4">Готово</label></div>
+<pre class="sh">cat .git/refs/heads/main          # хэш до reset
+git reset --soft HEAD~1
+cat .git/refs/heads/main          # хэш изменился — ветка перенесена
+git status                        # изменения зелёные (в индексе)
+git commit -m "Commit 3 again"
+
+git reset HEAD~1
+git status                        # изменения красные (в рабочей папке)
+git commit -am "Commit 3 again"
+
+git reset --hard HEAD~1
+git status                        # чисто
+git log --oneline                 # коммита 3 нет. Переходи к упражнению 5</pre>
+  </div>
+
+  <div class="ex" data-ex="5">
+    <div class="ex-head"><h4><small>Упражнение 5 — самое важное</small>Вернуть коммит через reflog</h4><label class="ex-check"><input type="checkbox" data-exc="5">Готово</label></div>
+<pre class="sh">git reflog               # в HEAD@{1} видно "commit: Commit 3 again"
+git reset --hard HEAD@{1}
+git log --oneline        # коммит вернулся
+cat app.txt              # line 3 на месте</pre>
+    <div class="callout tip">
+      <svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>
+      <p>Только что ты «удалил» коммит и вернул его. После этого упражнения reset перестаёт пугать.</p>
+    </div>
+  </div>
+
+  <div class="ex" data-ex="6">
+    <div class="ex-head"><h4><small>Упражнение 6</small>Восстановить удалённую ветку</h4><label class="ex-check"><input type="checkbox" data-exc="6">Готово</label></div>
+<pre class="sh">git switch -c experiment
+echo "experiment" &gt;&gt; app.txt &amp;&amp; git commit -am "Experiment"
+git switch main
+git branch -D experiment          # Deleted branch experiment (was 1a2b3c4).
+git branch experiment 1a2b3c4     # подставь свой хэш
+git log experiment --oneline      # ветка на месте</pre>
+  </div>
+
+  <div class="ex" data-ex="7">
+    <div class="ex-head"><h4><small>Упражнение 7</small>Stash</h4><label class="ex-check"><input type="checkbox" data-exc="7">Готово</label></div>
+<pre class="sh">echo "half-done feature" &gt;&gt; app.txt
+echo "new file" &gt; todo.txt
+git stash
+git status               # app.txt спрятан, а todo.txt остался (untracked)
+git stash pop
+
+git stash -u -m "feature in progress"
+git status               # теперь чисто
+git stash list
+git switch -c hotfix
+echo "fix" &gt;&gt; app.txt &amp;&amp; git commit -am "Hotfix"
+git switch main
+git stash pop            # изменения вернулись</pre>
+  </div>
+
+  <div class="ex" data-ex="8">
+    <div class="ex-head"><h4><small>Упражнение 8</small>Revert</h4><label class="ex-check"><input type="checkbox" data-exc="8">Готово</label></div>
+<pre class="sh">git add . &amp;&amp; git commit -m "Feature"
+git revert HEAD --no-edit
+git log --oneline        # появился коммит Revert "Feature"
+git revert HEAD --no-edit   # отменили отмену — изменения вернулись</pre>
+  </div>
+
+  <div class="ex" data-ex="9">
+    <div class="ex-head"><h4><small>Упражнение 9</small>Архив</h4><label class="ex-check"><input type="checkbox" data-exc="9">Готово</label></div>
+<pre class="sh">git archive --format=zip -o sandbox.zip HEAD</pre>
+  </div>
+</section>
+
+<!-- ================================================= 11 -->
+<section class="sec" id="s11" aria-labelledby="h-s11">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">11</span>
+    <div>
+      <h2 id="h-s11">Вопросы для самопроверки</h2>
+      <p class="sec-sub">Сначала ответь сам, потом открой ответ.</p>
+    </div>
+  </div>
+  <div class="qa-tools"><button class="ghost-btn" id="qaAll" type="button"><svg class="ico" aria-hidden="true"><use href="#i-eye"/></svg><span>Открыть все ответы</span></button></div>
+  <div id="qaList">
+    <details class="qa"><summary><span class="qn">01</span><span>Чем <code>git restore файл</code> отличается от <code>git restore --staged файл</code>?</span></summary><div class="ans"><p>Первая команда перезаписывает файл в рабочей папке, и правки теряются необратимо. Вторая перезаписывает только индекс, а правки в файле остаются.</p></div></details>
+    <details class="qa"><summary><span class="qn">02</span><span>Ты закоммитил, но не запушил, и хочешь исправить сообщение. Какая команда?</span></summary><div class="ans"><p><code>git commit --amend -m "новое сообщение"</code>.</p></div></details>
+    <details class="qa"><summary><span class="qn">03</span><span>Что такое ветка физически?</span></summary><div class="ans"><p>Файл в <code>.git/refs/heads/</code>, в котором записан хэш одного коммита.</p></div></details>
+    <details class="qa"><summary><span class="qn">04</span><span>Что делает <code>git reset --soft HEAD~2</code> и где окажутся изменения?</span></summary><div class="ans"><p>Переносит ветку на два коммита назад, не трогая индекс и рабочую папку. Изменения окажутся в индексе, готовые к новому коммиту.</p></div></details>
+    <details class="qa"><summary><span class="qn">05</span><span>Какой режим <code>reset</code> используется по умолчанию?</span></summary><div class="ans"><p><code>--mixed</code>: ветка и индекс сбрасываются, рабочая папка остаётся как была.</p></div></details>
+    <details class="qa"><summary><span class="qn">06</span><span>Почему после push нужен <code>revert</code>, а не <code>reset</code>?</span></summary><div class="ans"><p>У других людей есть эти коммиты. Переписывание истории приведёт к расхождению, force push и возможной потере чужих коммитов. <code>revert</code> только добавляет новый коммит.</p></div></details>
+    <details class="qa"><summary><span class="qn">07</span><span>Чем <code>HEAD~1</code> отличается от <code>HEAD@{1}</code>?</span></summary><div class="ans"><p><code>HEAD~1</code> — родительский коммит. <code>HEAD@{1}</code> — где был HEAD до последнего действия, по журналу reflog.</p></div></details>
+    <details class="qa"><summary><span class="qn">08</span><span>Ты сделал <code>git stash</code>, переключил ветку, а новый файл остался в папке. Почему?</span></summary><div class="ans"><p>Untracked-файлы без флага <code>-u</code> не прячутся.</p></div></details>
+    <details class="qa"><summary><span class="qn">09</span><span>Чем <code>pop</code> отличается от <code>apply</code>?</span></summary><div class="ans"><p><code>pop</code> = <code>apply</code> + <code>drop</code>.</p></div></details>
+    <details class="qa"><summary><span class="qn">10</span><span><code>git stash pop</code> выдал конфликт. Что стало с записью в списке?</span></summary><div class="ans"><p>Она осталась. После разрешения конфликта удали её сам через <code>git stash drop</code>.</p></div></details>
+    <details class="qa"><summary><span class="qn">11</span><span>Ты сделал <code>git reset --hard</code> и потерял незакоммиченные правки. Поможет ли reflog?</span></summary><div class="ans"><p>Нет. reflog знает только о коммитах.</p></div></details>
+    <details class="qa"><summary><span class="qn">12</span><span>Ты удалил ветку через <code>git branch -D</code>. Как её вернуть?</span></summary><div class="ans"><p>Возьми хэш из сообщения <code>Deleted branch … (was хэш)</code> или найди его в reflog. Затем <code>git branch имя хэш</code>.</p></div></details>
+    <details class="qa"><summary><span class="qn">13</span><span>Что делает <code>git clean -n</code> и почему его запускают первым?</span></summary><div class="ans"><p>Показывает, что будет удалено, ничего не удаляя. <code>clean -f</code> необратим.</p></div></details>
+    <details class="qa"><summary><span class="qn">14</span><span>Коммит, сделанный пять коммитов назад, уже на сервере и оказался плохим. Как его отменить?</span></summary><div class="ans"><p><code>git revert &lt;хэш&gt;</code>.</p></div></details>
+    <details class="qa"><summary><span class="qn">15</span><span>Как склеить 3 последних (не запушенных) коммита в один?</span></summary><div class="ans"><p><code>git reset --soft HEAD~3</code>, затем <code>git commit -m "…"</code>.</p></div></details>
+  </div>
+</section>
+
+<!-- ================================================= 12 -->
+<section class="sec" id="s12" aria-labelledby="h-s12">
+  <div class="sec-head">
+    <span class="sec-node" aria-hidden="true">12</span>
+    <div>
+      <h2 id="h-s12">Шпаргалка на одну страницу</h2>
+      <p class="sec-sub">Всё главное в одном месте. Её можно распечатать отдельно от конспекта.</p>
+    </div>
+  </div>
+  <div class="cheat-tools"><button class="ghost-btn" id="printCheat" type="button"><svg class="ico" aria-hidden="true"><use href="#i-print"/></svg>Распечатать шпаргалку</button></div>
+
+  <div class="cheat">
+    <div class="cc full law-c"><p>Закоммичено — спасаемо (через reflog). Не закоммичено — хрупко.</p></div>
+
+    <div class="cc">
+      <h4>Что есть в Git</h4>
+      <dl>
+        <dt>Рабочая папка</dt><dd>файлы на диске</dd>
+        <dt>Индекс</dt><dd>черновик следующего коммита</dd>
+        <dt>Коммиты</dt><dd>неизменяемые снимки</dd>
+        <dt>Ветка</dt><dd>файл с хэшем коммита</dd>
+        <dt>HEAD</dt><dd>файл с именем текущей ветки</dd>
+      </dl>
+    </div>
+
+    <div class="cc">
+      <h4>Правила</h4>
+      <ul>
+        <li><strong>Паника:</strong> <code>git status</code> и читай подсказки в скобках.</li>
+        <li><strong>Направление:</strong> вперёд — <code>add</code> и <code>commit</code>, назад — <code>restore</code> и <code>reset</code>.</li>
+        <li><strong>reSet — для Себя, reVert — для Всех.</strong></li>
+        <li><strong>Страховка перед рискованной командой:</strong> <code>git branch backup</code> или <code>git stash</code>.</li>
+      </ul>
+    </div>
+
+    <div class="cc full">
+      <h4>Команды</h4>
+      <ul>
+        <li><span class="dot danger"></span> <code>restore файл</code> — индекс → рабочая папка</li>
+        <li><span class="dot safe"></span> <code>restore --staged файл</code> — коммит → индекс</li>
+        <li><span class="dot safe"></span> <code>commit --amend</code> — новый коммит вместо последнего</li>
+        <li><span class="dot warn"></span> <code>reset --soft</code> / <code>--mixed</code> / <code>--hard</code> — меняют 1, 2 и 3 места (ветку, индекс, рабочую папку)</li>
+        <li><span class="dot safe"></span> <code>revert</code> — новый коммит с обратными изменениями</li>
+        <li><span class="dot safe"></span> <code>stash -u -m "…"</code> — спрятать, <code>stash pop</code> — вернуть; <strong>pop = apply + drop</strong></li>
+        <li><span class="dot danger"></span> <code>clean</code> — удаляет untracked, <strong>всегда сначала <code>-n</code></strong></li>
+        <li><span class="dot safe"></span> <code>reflog</code> — журнал перемещений HEAD; <code>HEAD@{n}</code> — где я был n действий назад</li>
+        <li><span class="dot safe"></span> <code>--abort</code> — выход из merge и rebase</li>
+        <li><span class="dot safe"></span> <code>archive</code> — zip с файлами коммита</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+    <footer class="foot">
+      <span>Конспект лекции «Инструменты отмены изменений и архивации в Git».</span>
+      <a href="#top">Наверх</a>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function () {
+'use strict';
+var root = document.documentElement;
+function $(s, c) { return (c || document).querySelector(s); }
+function $$(s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); }
+var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+var mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+function onMQ(mq, fn) { if (mq.addEventListener) mq.addEventListener('change', fn); else if (mq.addListener) mq.addListener(fn); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function restartClass(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+/* =========================================================
+   ТЕМА: светлая / тёмная / как в системе
+   ========================================================= */
+var KEY = 'gitundo-theme';
+var lamp = $('#lamp'), autoBtn = $('#autoBtn');
+var metas = $$('meta[name="theme-color"]');
+metas.forEach(function (m) { m.setAttribute('data-def', m.getAttribute('content')); });
+function readMode() { var a = root.getAttribute('data-theme'); return a === 'light' || a === 'dark' ? a : 'system'; }
+var mode = readMode();
+function effective(m) { return m === 'system' ? (mqDark.matches ? 'dark' : 'light') : m; }
+function syncTheme() {
+  var e = effective(mode);
+  var label = e === 'light' ? 'Выключить свет: тёмная тема' : 'Включить свет: светлая тема';
+  lamp.setAttribute('aria-pressed', e === 'light' ? 'true' : 'false');
+  lamp.setAttribute('aria-label', label);
+  lamp.title = label;
+  autoBtn.setAttribute('aria-pressed', mode === 'system' ? 'true' : 'false');
+  autoBtn.title = mode === 'system' ? 'Тема как в системе: включено' : 'Сделать тему как в системе';
+  metas.forEach(function (m) {
+    m.setAttribute('content', mode === 'system' ? m.getAttribute('data-def') : (mode === 'dark' ? '#0E1125' : '#F3F5FA'));
+  });
+}
+function applyMode(m) {
+  mode = m;
+  if (m === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', m);
+  try { if (m === 'system') localStorage.removeItem(KEY); else localStorage.setItem(KEY, m); } catch (e) {}
+  syncTheme();
+}
+var pullT, flickT;
+function switchTo(m) {
+  var before = effective(mode), after = effective(m);
+  restartClass(lamp, 'pull');
+  clearTimeout(pullT); pullT = setTimeout(function () { lamp.classList.remove('pull'); }, 220);
+  if (before === after) { applyMode(m); return; }
+  if (after === 'light') {
+    restartClass(lamp, 'flicker');
+    clearTimeout(flickT); flickT = setTimeout(function () { lamp.classList.remove('flicker'); }, 760);
+  }
+  if (!document.startViewTransition || mqReduce.matches) { applyMode(m); return; }
+  var r = lamp.querySelector('.lamp-bulb').getBoundingClientRect();
+  var x = r.left + r.width / 2, y = r.top + r.height * 0.66;
+  var R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  var on = after === 'light';
+  root.classList.toggle('vt-off', !on);
+  var t;
+  try { t = document.startViewTransition(function () { applyMode(m); }); }
+  catch (e) { applyMode(m); root.classList.remove('vt-off'); return; }
+  t.ready.then(function () {
+    var small = 'circle(0px at ' + x + 'px ' + y + 'px)';
+    var big = 'circle(' + R + 'px at ' + x + 'px ' + y + 'px)';
+    root.animate({ clipPath: on ? [small, big] : [big, small] }, {
+      duration: on ? 720 : 560,
+      easing: on ? 'cubic-bezier(.3,0,.15,1)' : 'cubic-bezier(.55,0,.35,1)',
+      fill: 'forwards',
+      pseudoElement: on ? '::view-transition-new(root)' : '::view-transition-old(root)'
+    });
+  }).catch(function () {});
+  var cleanup = function () { root.classList.remove('vt-off'); };
+  t.finished.then(cleanup, cleanup);
+}
+lamp.addEventListener('click', function () { switchTo(effective(mode) === 'light' ? 'dark' : 'light'); });
+autoBtn.addEventListener('click', function () { if (mode !== 'system') switchTo('system'); });
+onMQ(mqDark, syncTheme);
+window.addEventListener('storage', function (e) {
+  if (e.key !== KEY) return;
+  var v = e.newValue === 'light' || e.newValue === 'dark' ? e.newValue : 'system';
+  mode = v;
+  if (v === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', v);
+  syncTheme();
+});
+syncTheme();
+
+/* =========================================================
+   БЛОКИ КОДА: подсветка, подписи, копирование
+   ========================================================= */
+var REF = /^(HEAD|ORIG_HEAD)([~^@].*)?$|^origin\/|^(stash|main|HEAD)@\{|^[0-9a-f]{7,40}$/;
+function span(c, t) { return '<span class="' + c + '">' + esc(t) + '</span>'; }
+function hlLine(line) {
+  var inS = false, inD = false, ci = -1, i, c;
+  for (i = 0; i < line.length; i++) {
+    c = line[i];
+    if (c === '"' && !inS) inD = !inD;
+    else if (c === "'" && !inD) inS = !inS;
+    else if (c === '#' && !inS && !inD && (i === 0 || /\s/.test(line[i - 1]))) { ci = i; break; }
+  }
+  var code = ci >= 0 ? line.slice(0, ci) : line, com = ci >= 0 ? line.slice(ci) : '';
+  var out = '', expectCmd = false, re = /"[^"]*"?|'[^']*'?|\s+|[^\s"']+/g, m;
+  while ((m = re.exec(code))) {
+    var tok = m[0], cls = '';
+    if (/^\s+$/.test(tok)) { out += tok; continue; }
+    if (tok[0] === '"' || tok[0] === "'") cls = 't-str';
+    else if (tok === 'git') { out += span('t-git', tok); expectCmd = true; continue; }
+    else if (expectCmd) cls = 't-cmd';
+    else if (/^--?[A-Za-z]/.test(tok)) cls = 't-flag';
+    else if (/^(&&|\|\||\||>>?|→)$/.test(tok)) cls = 't-op';
+    else if (REF.test(tok)) cls = 't-ref';
+    expectCmd = false;
+    out += cls ? span(cls, tok) : esc(tok);
+  }
+  if (com) out += span('t-com', com);
+  return out;
+}
+function copyText(text, btn) {
+  var label = btn.querySelector('span'), use = btn.querySelector('use');
+  function done(ok) {
+    btn.classList.toggle('ok', ok);
+    label.textContent = ok ? 'Скопировано' : 'Не удалось';
+    use.setAttribute('href', ok ? '#i-check' : '#i-copy');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () { btn.classList.remove('ok'); label.textContent = 'Копировать'; use.setAttribute('href', '#i-copy'); }, 1600);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); done(ok);
+  }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+  else fallback();
+}
+function enhancePre(pre) {
+  var isSh = pre.classList.contains('sh');
+  if (isSh) { pre._raw = pre.textContent; pre.innerHTML = pre._raw.split('\n').map(hlLine).join('\n'); }
+  var wrap = document.createElement('div');
+  wrap.className = 'code ' + (isSh ? 'is-sh' : 'is-out');
+  var bar = document.createElement('div'); bar.className = 'code-bar';
+  var lab = document.createElement('span'); lab.className = 'code-label';
+  lab.textContent = pre.getAttribute('data-label') || (isSh ? 'Команды' : 'Что покажет Git');
+  bar.appendChild(lab);
+  if (isSh) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'copy'; b.setAttribute('aria-label', 'Копировать команды');
+    b.innerHTML = '<svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg><span>Копировать</span>';
+    b.addEventListener('click', function () { copyText(pre._raw, b); });
+    bar.appendChild(b);
+  }
+  pre.parentNode.insertBefore(wrap, pre);
+  wrap.appendChild(bar); wrap.appendChild(pre);
+  return wrap;
+}
+$$('pre.sh, pre.out').forEach(enhancePre);
+
+/* =========================================================
+   SVG-ГРАФЫ КОММИТОВ
+   ========================================================= */
+var NS = 'http://www.w3.org/2000/svg';
+function sv(name, attrs, parent) {
+  var e = document.createElementNS(NS, name);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function textLen(t, fallbackPerChar) {
+  var l = 0; try { l = t.getComputedTextLength(); } catch (e) {}
+  return l || t.textContent.length * fallbackPerChar;
+}
+function buildGraph(host) {
+  var spec; try { spec = JSON.parse(host.getAttribute('data-graph')); } catch (e) { return; }
+  host.innerHTML = '';
+  var DX = 76, DY = 60, X0 = 22, Y0 = 22, R = 17;
+  var names = spec.n.map(function (n) { return n[0]; }).join(', ');
+  var svg = sv('svg', { role: 'img', 'aria-label': 'Коммиты ' + names }, host);
+  var gE = sv('g', {}, svg), gN = sv('g', {}, svg), gT = sv('g', {}, svg);
+  var pos = {};
+  spec.n.forEach(function (n) { pos[n[0]] = { x: X0 + n[1] * DX, y: Y0 + n[2] * DY }; });
+  (spec.e || []).forEach(function (e) {
+    var a = pos[e[0]], b = pos[e[1]]; if (!a || !b) return;
+    var d = a.y === b.y
+      ? 'M' + a.x + ' ' + a.y + 'L' + b.x + ' ' + b.y
+      : 'M' + a.x + ' ' + a.y + 'C' + (a.x + DX * .6) + ' ' + a.y + ' ' + (b.x - DX * .6) + ' ' + b.y + ' ' + b.x + ' ' + b.y;
+    sv('path', { d: d, 'class': 'ge' + (e[2] ? ' d' : '') }, gE);
+  });
+  spec.n.forEach(function (n) {
+    var p = pos[n[0]];
+    var g = sv('g', { 'class': 'gn' + (n[3] ? ' ' + n[3] : '') }, gN);
+    sv('circle', { cx: p.x, cy: p.y, r: R }, g);
+    var t = sv('text', { x: p.x, y: p.y }, g); t.textContent = n[0];
+    if (n[4]) { var s = sv('g', { 'class': 'gt-sub' }, gT); var st = sv('text', { x: p.x, y: p.y + R + 17 }, s); st.textContent = n[4]; }
+  });
+  var cursor = {};
+  (spec.t || []).forEach(function (t) {
+    var p = pos[t[0]]; if (!p) return;
+    var kind = t[2] || 'branch';
+    var cx = cursor[t[0]] || (p.x + R + 10);
+    if (kind === 'note') {
+      var gn = sv('g', { 'class': 'gt-note' }, gT);
+      var tn = sv('text', { x: cx + 2, y: p.y }, gn); tn.textContent = t[1];
+      cursor[t[0]] = cx + textLen(tn, 7) + 14;
+      return;
+    }
+    var gp = sv('g', { 'class': 'gt-pill gt-' + kind }, gT);
+    var rect = sv('rect', { x: cx, y: p.y - 11, height: 22, rx: 7 }, gp);
+    var tp = sv('text', { x: cx + 8, y: p.y }, gp); tp.textContent = t[1];
+    var w = textLen(tp, 7.2) + 16;
+    rect.setAttribute('width', w);
+    cursor[t[0]] = cx + w + 6;
+  });
+  var bb; try { bb = svg.getBBox(); } catch (e) { bb = null; }
+  if (!bb || !bb.width) return;
+  var pad = 6, vb = [Math.floor(bb.x - pad), Math.floor(bb.y - pad), Math.ceil(bb.width + pad * 2), Math.ceil(bb.height + pad * 2)];
+  svg.setAttribute('viewBox', vb.join(' '));
+  svg.setAttribute('width', vb[2]);
+  svg.setAttribute('height', vb[3]);
+}
+var graphs = $$('.graph[data-graph]');
+function buildAll() { graphs.forEach(buildGraph); }
+buildAll();
+if (document.fonts) {
+  var gt;
+  var rebuild = function () { clearTimeout(gt); gt = setTimeout(buildAll, 60); };
+  if (document.fonts.ready) document.fonts.ready.then(rebuild);
+  if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', rebuild);
+}
+
+/* =========================================================
+   ОГЛАВЛЕНИЕ: метка HEAD, прогресс, мобильная панель
+   ========================================================= */
+var secs = $$('#main .sec'), links = $$('#tocList a'), tFill = $('#tocFill'), tHead = $('#tocHead'), prog = $('#progress');
+var curSec = -2, ticking = false;
+function placeHead() {
+  if (curSec < 0) { tHead.classList.remove('on'); tFill.style.height = '0px'; return; }
+  var a = links[curSec];
+  var mid = a.offsetTop + a.offsetHeight / 2;
+  tFill.style.height = Math.max(0, mid - 17) + 'px';
+  tHead.style.setProperty('--y', (mid - tHead.offsetHeight / 2) + 'px');
+  tHead.classList.add('on');
+}
+function onScroll() {
+  ticking = false;
+  var vh = window.innerHeight, idx = -1;
+  for (var i = 0; i < secs.length; i++) {
+    if (secs[i].getBoundingClientRect().top - vh * 0.35 <= 0) idx = i; else break;
+  }
+  var max = document.documentElement.scrollHeight - vh;
+  prog.style.setProperty('--p', max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0);
+  if (idx !== curSec) {
+    curSec = idx;
+    links.forEach(function (a, j) {
+      a.classList.toggle('active', j === idx);
+      a.classList.toggle('done', j < idx);
+      if (j === idx) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+    placeHead();
+  }
+}
+window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+window.addEventListener('resize', function () { placeHead(); onScroll(); });
+onScroll();
+
+var tocBtn = $('#tocBtn'), tocClose = $('#tocClose'), tocBack = $('#tocBackdrop');
+function openToc() {
+  document.body.classList.add('toc-open'); tocBtn.setAttribute('aria-expanded', 'true');
+  placeHead(); setTimeout(function () { tocClose.focus(); }, 60);
+}
+function closeToc(focusBtn) {
+  if (!document.body.classList.contains('toc-open')) return;
+  document.body.classList.remove('toc-open'); tocBtn.setAttribute('aria-expanded', 'false');
+  if (focusBtn) tocBtn.focus();
+}
+tocBtn.addEventListener('click', function () { if (document.body.classList.contains('toc-open')) closeToc(true); else openToc(); });
+tocClose.addEventListener('click', function () { closeToc(true); });
+tocBack.addEventListener('click', function () { closeToc(false); });
+links.forEach(function (a) { a.addEventListener('click', function () { closeToc(false); }); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeToc(true); });
+
+/* =========================================================
+   ГЕРОЙ: reset «удаляет» коммиты, reflog их возвращает
+   ========================================================= */
+var dg = $('#demoGraph'), term = $('#demoTerm'), dcap = $('#demoCap'), replay = $('#demoReplay');
+var dNodes = $$('.lg-node', dg), dEdges = $$('.lg-edge', dg), dPtr = $('.lg-ptr', dg);
+var demoRun = 0;
+var CAP0 = 'В истории четыре коммита, ветка main указывает на D.';
+var CAPEND = 'Коммиты вернулись. Закоммиченное почти невозможно потерять.';
+function dGhost(on) {
+  [2, 3].forEach(function (i) { dNodes[i].classList.toggle('ghost', on); });
+  [1, 2].forEach(function (i) { dEdges[i].classList.toggle('ghost', on); });
+}
+function tLine(html, cls) { var d = document.createElement('div'); d.className = 'ln' + (cls ? ' ' + cls : ''); d.innerHTML = html; term.appendChild(d); return d; }
+function wait(ms, id) { return new Promise(function (res, rej) { setTimeout(function () { if (id === demoRun) res(); else rej('stop'); }, ms); }); }
+function typeCmd(text, id) {
+  var d = tLine('<span class="pr">$ </span><span class="tx"></span><span class="cur"></span>');
+  var tx = d.querySelector('.tx'), i = 0;
+  return new Promise(function (res, rej) {
+    (function step() {
+      if (id !== demoRun) { rej('stop'); return; }
+      tx.textContent = text.slice(0, ++i);
+      if (i < text.length) setTimeout(step, 30 + Math.random() * 34);
+      else { var c = d.querySelector('.cur'); if (c) c.parentNode.removeChild(c); setTimeout(res, 280); }
+    })();
+  });
+}
+var L = {
+  c1: '<span class="pr">$ </span>git reset --hard HEAD~2',
+  o1: '<span class="o">HEAD is now at <b>5c4b3a2</b> B</span>',
+  c2: '<span class="pr">$ </span>git reflog',
+  r0: '<span class="o"><b>5c4b3a2</b> HEAD@{0}: reset: moving to HEAD~2</span>',
+  r1: '<span class="o"><b>9d8e7f6</b> HEAD@{1}: commit: D</span>',
+  r2: '<span class="o"><b>1a2b3c4</b> HEAD@{2}: commit: C</span>',
+  c3: '<span class="pr">$ </span>git reset --hard HEAD@{1}',
+  o3: '<span class="o">HEAD is now at <b>9d8e7f6</b> D</span>'
+};
+function demoStatic() {
+  demoRun++;
+  term.innerHTML = '';
+  ['c1', 'o1', 'c2', 'r0', 'r1', 'r2', 'c3', 'o3'].forEach(function (k) { tLine(L[k]); });
+  dGhost(false); dPtr.style.setProperty('--at', 3); dcap.textContent = CAPEND; replay.hidden = true;
+}
+function playDemo() {
+  var id = ++demoRun;
+  replay.hidden = true; term.innerHTML = ''; dGhost(false);
+  dPtr.style.setProperty('--at', 3);
+  dNodes.forEach(function (n) { n.classList.remove('pulse'); });
+  restartClass(dg, 'built');
+  setTimeout(function () { dg.classList.remove('built'); }, 1100);
+  dcap.textContent = CAP0;
+  var r1;
+  wait(1200, id)
+    .then(function () { return typeCmd('git reset --hard HEAD~2', id); })
+    .then(function () {
+      tLine(L.o1); dPtr.style.setProperty('--at', 1);
+      return wait(420, id);
+    })
+    .then(function () {
+      dGhost(true);
+      dcap.textContent = 'Ветка перенесена на B. Коммиты C и D пропали из git log, но остались в .git.';
+      return wait(1900, id);
+    })
+    .then(function () { return typeCmd('git reflog', id); })
+    .then(function () { tLine(L.r0); return wait(170, id); })
+    .then(function () { r1 = tLine(L.r1); return wait(170, id); })
+    .then(function () {
+      tLine(L.r2);
+      dcap.textContent = 'reflog помнит, где был HEAD до reset: это HEAD@{1}.';
+      return wait(450, id);
+    })
+    .then(function () { r1.classList.add('flash'); return wait(1700, id); })
+    .then(function () { return typeCmd('git reset --hard HEAD@{1}', id); })
+    .then(function () {
+      tLine(L.o3); dGhost(false); dPtr.style.setProperty('--at', 3);
+      return wait(600, id);
+    })
+    .then(function () {
+      dNodes[2].classList.add('pulse'); dNodes[3].classList.add('pulse');
+      dcap.textContent = CAPEND;
+      replay.hidden = false;
+    })
+    .catch(function () {});
+}
+replay.addEventListener('click', playDemo);
+if (mqReduce.matches) demoStatic();
+else {
+  var started = false;
+  var startDemo = function () { if (!started) { started = true; setTimeout(playDemo, 350); } };
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (en) { if (en.isIntersecting) { startDemo(); io.disconnect(); } });
+    }, { threshold: 0.35 });
+    io.observe($('#demo'));
+  } else startDemo();
+}
+
+/* =========================================================
+   ТРЕНАЖЁР RESET
+   ========================================================= */
+(function () {
+  var sim = $('#resetSim'); if (!sim) return;
+  var btns = $$('.seg button', sim), cmd = $('#rsCmd'), steps = $$('.sstep', sim), status = $('#rsStatus'), explain = $('#rsExplain');
+  var g = $('#rsGraph'), nodes = $$('.lg-node', g), edges = $$('.lg-edge', g), ptr = $('.lg-ptr', g);
+  var Z = {}; $$('.szone', sim).forEach(function (z) { Z[z.getAttribute('data-z')] = z; });
+  var run = 0;
+  var ST = {
+    clean: 'On branch main\nnothing to commit, working tree clean',
+    soft: 'On branch main\nChanges to be committed:\n  <span class="o-y">(use "git restore --staged &lt;file&gt;..." to unstage)</span>\n        <span class="o-g">modified:   app.txt</span>',
+    mixed: 'On branch main\nChanges not staged for commit:\n  <span class="o-y">(use "git add &lt;file&gt;..." to update what will be committed)</span>\n  <span class="o-y">(use "git restore &lt;file&gt;..." to discard changes in working directory)</span>\n        <span class="o-r">modified:   app.txt</span>',
+    hard: '<span class="o-d">HEAD is now at 5c4b3a2 B</span>\nOn branch main\nnothing to commit, working tree clean'
+  };
+  var EX = {
+    init: 'Всё совпадает: ветка main указывает на D, а индекс и рабочая папка содержат те же четыре строки. <code>git status</code> чистый.',
+    soft: '<strong>--soft</strong> сделал только шаг 1: ветка теперь указывает на B. Индекс и рабочая папка не тронуты и всё ещё содержат строки C и D. Относительно коммита B это подготовленные изменения: они зелёные, можно сразу делать <code>git commit</code>.',
+    mixed: '<strong>--mixed</strong> сделал шаги 1 и 2: ветка и индекс теперь как в B. Рабочая папка не тронута, строки C и D остались в файле. Это неподготовленные изменения: они красные, их нужно снова добавить через <code>git add</code>.',
+    hard: '<strong>--hard</strong> сделал все три шага: ветка, индекс и рабочая папка теперь как в B. Строки C и D исчезли из файла. Сами коммиты C и D ещё можно вернуть через reflog, а вот незакоммиченные правки --hard стёр бы навсегда.'
+  };
+  function lis(z) { return $$('li', Z[z]); }
+  function setLines(z, cls) { lis(z).forEach(function (li) { var l = li.getAttribute('data-l'); li.className = (l === 'C' || l === 'D') ? cls : ''; }); }
+  function sub(z, t) { $('.szone-s', Z[z]).textContent = t; }
+  function ghost(on) {
+    [2, 3].forEach(function (i) { nodes[i].classList.toggle('ghost', on); });
+    [1, 2].forEach(function (i) { edges[i].classList.toggle('ghost', on); });
+  }
+  function reset(keepBtns) {
+    run++;
+    if (!keepBtns) btns.forEach(function (b) { b.setAttribute('aria-checked', 'false'); });
+    ptr.style.setProperty('--at', 3); ghost(false);
+    ['branch', 'index', 'work'].forEach(function (z) { setLines(z, ''); Z[z].classList.remove('changed'); });
+    sub('branch', 'указывает на D'); sub('index', 'как в D'); sub('work', 'как в D');
+    steps.forEach(function (s) { s.classList.remove('on', 'skipped'); });
+    status.innerHTML = ST.clean;
+    explain.innerHTML = EX.init;
+    cmd.textContent = 'git reset HEAD~2';
+  }
+  function later(ms, id, fn) { setTimeout(function () { if (id === run) fn(); }, ms); }
+  function play(m) {
+    reset(true);
+    var id = run, n = m === 'soft' ? 1 : m === 'mixed' ? 2 : 3;
+    btns.forEach(function (b) { b.setAttribute('aria-checked', b.getAttribute('data-mode') === m ? 'true' : 'false'); });
+    cmd.textContent = 'git reset --' + m + ' HEAD~2';
+    explain.textContent = 'Выполняю…';
+    later(250, id, function () {
+      steps[0].classList.add('on');
+      ptr.style.setProperty('--at', 1);
+      later(400, id, function () { ghost(true); });
+      setLines('branch', 'gone'); Z.branch.classList.add('changed'); sub('branch', 'указывает на B');
+      if (n === 1) setLines('index', 'st');
+    });
+    later(1150, id, function () {
+      if (n >= 2) {
+        steps[1].classList.add('on');
+        setLines('index', 'gone'); Z.index.classList.add('changed'); sub('index', 'как в B');
+        if (n === 2) setLines('work', 'wk');
+      } else steps[1].classList.add('skipped');
+    });
+    later(2000, id, function () {
+      if (n >= 3) {
+        steps[2].classList.add('on');
+        setLines('work', 'gone'); Z.work.classList.add('changed'); sub('work', 'как в B');
+      } else steps[2].classList.add('skipped');
+      status.innerHTML = ST[m];
+      explain.innerHTML = EX[m];
+    });
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { play(b.getAttribute('data-mode')); }); });
+  $('#rsBack').addEventListener('click', function () { reset(false); });
+  reset(false);
+})();
+
+/* =========================================================
+   ТРЕНАЖЁР HEAD~ / HEAD@{}
+   ========================================================= */
+(function () {
+  var sim = $('#hx'); if (!sim) return;
+  var btns = $$('.seg button', sim), nodes = $$('.lg-node', $('#hxGraph')), out = $('#hxExplain');
+  var HX = {
+    'HEAD': [1, '<strong>HEAD</strong> — коммит, на котором ты сейчас. После reset это B.'],
+    'HEAD~1': [0, '<strong>HEAD~1</strong> — родитель текущего коммита, то есть A. Это шаг назад по истории. Про C и D история уже ничего не знает.'],
+    'HEAD@{1}': [3, '<strong>HEAD@{1}</strong> — где HEAD был одно действие назад, то есть до reset. Это D. Так «удалённые» коммиты и возвращают: <code>git reset --hard HEAD@{1}</code>.'],
+    'HEAD@{2}': [2, '<strong>HEAD@{2}</strong> — где HEAD был два действия назад: сразу после коммита C.']
+  };
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var ref = b.getAttribute('data-ref'), d = HX[ref];
+      btns.forEach(function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
+      nodes.forEach(function (n, i) {
+        n.classList.toggle('target', i === d[0]);
+        if (i === d[0]) n.setAttribute('data-label', ref); else n.removeAttribute('data-label');
+      });
+      out.innerHTML = d[1];
+    });
+  });
+})();
+
+/* =========================================================
+   ТРЕНАЖЁР STASH
+   ========================================================= */
+(function () {
+  var sim = $('#stashSim'); if (!sim) return;
+  var stackEl = $('#stStack'), workEl = $('#stWork'), cmdEl = $('#stCmd'), logEl = $('#stLog'), countEl = $('#stCount');
+  var POOL = [
+    { f: 'style.css', w: 'новые цвета кнопок' }, { f: 'README.md', w: 'описание установки' },
+    { f: 'api.js', w: 'черновик запроса' }, { f: 'index.html', w: 'новое меню' },
+    { f: 'app.js', w: 'валидация формы' }, { f: 'utils.js', w: 'форматирование дат' }
+  ];
+  var S;
+  function fresh() {
+    return {
+      stack: [
+        { msg: 'On feature: новый header', ch: [{ f: 'header.css', w: 'новый header' }] },
+        { msg: 'On main: эксперимент с цветами', ch: [{ f: 'colors.css', w: 'эксперимент с цветами' }] }
+      ],
+      work: [{ f: 'login.js', w: 'форма логина, недоделано' }],
+      sel: 0, pool: 0
+    };
+  }
+  function ref(i) { return 'stash@{' + i + '}'; }
+  function plural(n) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return n + ' запись';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return n + ' записи';
+    return n + ' записей';
+  }
+  function key(c) { return c.f + '|' + c.w; }
+  function render(fx) {
+    fx = fx || {};
+    stackEl.innerHTML = '';
+    if (!S.stack.length) {
+      var e = document.createElement('li'); e.className = 'stack-empty'; e.textContent = 'Список пуст';
+      stackEl.appendChild(e);
+    }
+    S.stack.forEach(function (en, i) {
+      var li = document.createElement('li');
+      if (fx.newIdx === i) li.className = 'new';
+      else if (fx.renumFrom !== undefined && i >= fx.renumFrom) li.className = 'renum';
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', i === S.sel ? 'true' : 'false');
+      b.innerHTML = '<span class="sref">' + ref(i) + '</span><span>' + esc(en.msg) + '</span>';
+      b.addEventListener('click', function () {
+        S.sel = i; render();
+        cmdEl.textContent = 'git stash show ' + ref(i);
+        logEl.innerHTML = 'Выбрана запись <code>' + ref(i) + '</code>. В ней: ' + en.ch.map(function (c) { return '<code>' + esc(c.f) + '</code> (' + esc(c.w) + ')'; }).join(', ') + '.';
+      });
+      li.appendChild(b); stackEl.appendChild(li);
+    });
+    countEl.textContent = S.stack.length ? plural(S.stack.length) : '';
+    workEl.innerHTML = '';
+    if (!S.work.length) {
+      workEl.innerHTML = '<div class="work-clean"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Чисто: nothing to commit</div>';
+    } else {
+      var ul = document.createElement('ul');
+      S.work.forEach(function (c, i) {
+        var li = document.createElement('li');
+        if (fx.newWork && fx.newWork.indexOf(i) >= 0) li.className = 'new';
+        li.textContent = 'modified: ' + c.f + ' — ' + c.w;
+        ul.appendChild(li);
+      });
+      workEl.appendChild(ul);
+    }
+  }
+  function argRef() { return S.sel > 0 ? ' ' + ref(S.sel) : ''; }
+  function act(a) {
+    var fx = {}, n = S.stack.length, i = S.sel, en;
+    if (a === 'edit') {
+      var tries = 0, c;
+      do { c = POOL[S.pool++ % POOL.length]; tries++; }
+      while (tries <= POOL.length && S.work.some(function (w) { return key(w) === key(c); }));
+      S.work.push(c); fx.newWork = [S.work.length - 1];
+      cmdEl.textContent = '# отредактировал ' + c.f;
+      logEl.innerHTML = 'Ты поменял <code>' + esc(c.f) + '</code>. Эти правки пока только в рабочей папке: Git их нигде не сохранил.';
+    } else if (a === 'push') {
+      cmdEl.textContent = 'git stash';
+      if (!S.work.length) {
+        logEl.innerHTML = '<code>No local changes to save</code>. Прятать нечего: рабочая папка чистая. Нажми «Изменить файл».';
+      } else {
+        var msg = 'On feature: ' + S.work[0].w + (S.work.length > 1 ? ' (+' + (S.work.length - 1) + ')' : '');
+        S.stack.unshift({ msg: msg, ch: S.work.slice() });
+        S.work = []; S.sel = 0; fx.newIdx = 0; fx.renumFrom = 1;
+        logEl.innerHTML = 'Правки упакованы в <code>stash@{0}</code>, рабочая папка чистая.' + (n ? ' Остальные записи сдвинулись вниз: их номера выросли на 1.' : '');
+      }
+    } else {
+      cmdEl.textContent = 'git stash ' + a + (n ? argRef() : '');
+      if (!n) { logEl.innerHTML = '<code>No stash entries found.</code> Список пуст: сначала что-нибудь спрячь.'; render(); return; }
+      en = S.stack[i];
+      if (a === 'apply' || a === 'pop') {
+        var added = [];
+        en.ch.forEach(function (c) { if (!S.work.some(function (w) { return key(w) === key(c); })) { S.work.push(c); added.push(S.work.length - 1); } });
+        fx.newWork = added;
+        if (!added.length) {
+          logEl.innerHTML = 'Изменения из <code>' + ref(i) + '</code> уже есть в рабочей папке, применять нечего.';
+          render(); return;
+        }
+      }
+      if (a === 'apply') {
+        logEl.innerHTML = 'Изменения из <code>' + ref(i) + '</code> вернулись в рабочую папку. Запись осталась в списке: <code>apply</code> её не удаляет.';
+      } else {
+        S.stack.splice(i, 1);
+        if (S.sel >= S.stack.length) S.sel = Math.max(0, S.stack.length - 1);
+        fx.renumFrom = i;
+        var moved = i < S.stack.length ? ' Записи ниже поднялись: их номера уменьшились на 1.' : '';
+        if (a === 'pop') logEl.innerHTML = 'Изменения из <code>' + ref(i) + '</code> вернулись в рабочую папку, а запись удалена. <strong>pop = apply + drop</strong>.' + moved;
+        else logEl.innerHTML = 'Запись <code>' + ref(i) + '</code> удалена, её изменения никуда не применились.' + moved;
+      }
+    }
+    render(fx);
+  }
+  $$('.stash-actions button', sim).forEach(function (b) { b.addEventListener('click', function () { act(b.getAttribute('data-act')); }); });
+  function start() {
+    S = fresh(); render();
+    cmdEl.textContent = 'git stash list';
+    logEl.innerHTML = 'В рабочей папке недоделанная форма логина. Спрячь её через <code>git stash</code>.';
+  }
+  $('#stReset').addEventListener('click', start);
+  start();
+})();
+
+/* =========================================================
+   МАТРИЦА: что меняет команда
+   ========================================================= */
+(function () {
+  var box = $('#mxCmds'); if (!box) return;
+  var zones = $$('.mxz', $('#mx')), note = $('#mxNote');
+  var BADGE = { safe: 'безопасно', warn: 'осторожно', danger: 'необратимо' };
+  var MX = [
+    { k: 'git restore файл', b: 'danger', z: [[0], [0], [2, 'Перезаписывается', 'версией файла из индекса']], n: 'Незакоммиченные правки в файле пропадут навсегда.' },
+    { k: 'git restore --staged файл', b: 'safe', z: [[0], [1, 'Перезаписывается', 'версией файла из последнего коммита'], [0]], n: 'Правки в файле остаются. Файл просто перестаёт быть подготовленным к коммиту.' },
+    { k: 'git reset --soft', b: 'safe', z: [[1, 'Переносится', 'на указанный коммит'], [0], [0]], n: 'Изменения из убранных коммитов остаются в индексе, можно сразу коммитить.' },
+    { k: 'git reset --mixed', b: 'safe', z: [[1, 'Переносится', 'на указанный коммит'], [1, 'Перезаписывается', 'содержимым этого коммита'], [0]], n: 'Режим по умолчанию. Изменения остаются в рабочей папке, но не добавлены.' },
+    { k: 'git reset --hard', b: 'warn', z: [[1, 'Переносится', 'на указанный коммит'], [1, 'Перезаписывается', 'содержимым этого коммита'], [2, 'Перезаписывается', 'содержимым этого коммита']], n: 'Коммиты вернёт reflog, а незакоммиченные правки пропадут навсегда.' },
+    { k: 'git revert', b: 'safe', z: [[1, 'Новый коммит', 'с обратными изменениями'], [1, 'Обновляется', 'под новый коммит'], [1, 'Обновляется', 'под новый коммит']], n: 'История только дополняется. Безопасно даже после push.' },
+    { k: 'git stash', b: 'safe', z: [[0], [1, 'Очищается', 'изменения сохранены в stash'], [1, 'Очищается', 'изменения сохранены в stash']], n: 'Ничего не теряется: изменения лежат в stash, пока ты их не вернёшь.' },
+    { k: 'git clean -f', b: 'danger', z: [[0], [0], [2, 'Удаляются untracked-файлы', 'с диска, мимо корзины']], n: 'Всегда сначала git clean -n, чтобы посмотреть список.' }
+  ];
+  var btns = MX.map(function (m, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = m.k; b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', function () { show(i); });
+    box.appendChild(b); return b;
+  });
+  function show(i) {
+    var m = MX[i];
+    btns.forEach(function (b, j) { b.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
+    zones.forEach(function (z, j) {
+      var d = m.z[j], s = d[0];
+      z.className = 'mxz s' + s;
+      $('.mxz-v', z).textContent = s ? d[1] : 'Не меняется';
+      $('.mxz-d', z).textContent = s ? d[2] : '';
+    });
+    note.innerHTML = '<span class="badge ' + m.b + '">' + BADGE[m.b] + '</span><span>' + esc(m.n) + '</span>';
+  }
+  show(4);
+})();
+
+/* =========================================================
+   ДЕРЕВО РЕШЕНИЙ
+   ========================================================= */
+(function () {
+  var body = $('#wizBody'); if (!body) return;
+  var W = {
+    start: { q: 'Что ты хочешь отменить?', o: [
+      ['Правки, которые ещё не закоммичены', 'Файлы изменены или добавлены через git add', 'unc'],
+      ['Коммиты', 'То, что уже попало в историю', 'com'] ] },
+    unc: { q: 'Что сделать с этими правками?', o: [
+      ['Выбросить навсегда', 'Вернуть файлы к последнему коммиту', 'r_restore'],
+      ['Убрать из индекса', 'Правки сохранить, но не коммитить', 'r_unstage'],
+      ['Отложить на потом', 'Переключиться на другую задачу', 'r_stash'] ] },
+    com: { q: 'Эти коммиты уже запушены?', o: [
+      ['Нет, они только у меня', 'Ещё не делал push', 'local'],
+      ['Да, они на сервере', 'Коллеги могли их скачать', 'r_revert'],
+      ['Коммиты «пропали»', 'После reset, rebase или удаления ветки', 'r_reflog'] ] },
+    local: { q: 'Что именно нужно сделать?', o: [
+      ['Исправить последний коммит', 'Сообщение или забытый файл', 'r_amend'],
+      ['Убрать последние N коммитов', 'Отрезать их от ветки', 'r_reset'] ] },
+    r_restore: { t: 'git restore', b: 'danger', code: 'git diff файл       # сначала посмотри, что сотрёшь\ngit restore файл\ngit clean -n        # новые (untracked) файлы: сначала просмотр\ngit clean -f', p: 'Файл вернётся к версии из индекса (если ты не делал add — к последнему коммиту). Правки пропадут навсегда. Новые файлы удаляет git clean.', l: '#step1' },
+    r_unstage: { t: 'git restore --staged', b: 'safe', code: 'git restore --staged файл', p: 'Файл выйдет из индекса, а правки в нём останутся.', l: '#step2' },
+    r_stash: { t: 'git stash', b: 'safe', code: 'git stash -u -m "что это за работа"\n# ... занимаешься другим ...\ngit stash pop', p: 'Изменения, включая новые файлы, спрячутся, рабочая папка станет чистой. Вернуть их можно на любой ветке.', l: '#s5' },
+    r_amend: { t: 'git commit --amend', b: 'safe', code: 'git commit --amend -m "Новое сообщение"\n# или, если забыл файл:\ngit add файл\ngit commit --amend --no-edit', p: 'Git создаст новый коммит вместо последнего. Годится, только пока коммит не запушен.', l: '#step3a' },
+    r_reset: { t: 'git reset HEAD~N', b: 'warn', code: 'git reset --soft HEAD~N    # изменения останутся в индексе\ngit reset HEAD~N           # останутся в рабочей папке\ngit reset --hard HEAD~N    # изменения будут стёрты', p: 'Режим выбирай по тому, что нужно сделать с изменениями из убранных коммитов. Разницу наглядно показывает тренажёр reset.', l: '#step3b' },
+    r_revert: { t: 'git revert', b: 'safe', code: 'git log --oneline     # найди хэш плохого коммита\ngit revert a1b2c3d', p: 'Появится новый коммит, который отменяет изменения плохого. Историю переписывать и делать force push не нужно.', l: '#step4' },
+    r_reflog: { t: 'git reflog', b: 'safe', code: 'git reflog                  # найди строку до неудачного действия\ngit branch rescue <хэш>     # самый безопасный вариант\ngit reset --hard HEAD@{n}   # или вернуть ветку туда', p: 'reflog помнит все перемещения HEAD, а «потерянные» коммиты хранятся не меньше 30 дней.', l: '#s6' }
+  };
+  var BADGE = { safe: 'безопасно', warn: 'осторожно', danger: 'необратимо' };
+  var hist = [{ k: 'start' }];
+  function render(focus) {
+    var cur = hist[hist.length - 1], node = W[cur.k], html = '';
+    html += '<div class="wiz-crumbs">' + (hist.length > 1
+      ? hist.slice(1).map(function (h, i) { return (i ? '<i>→</i>' : '') + '<span>' + esc(h.label) + '</span>'; }).join('')
+      : '<span>Начало</span>') + '</div>';
+    if (node.q) {
+      html += '<p class="wiz-q" tabindex="-1">' + esc(node.q) + '</p><div class="wiz-opts">';
+      node.o.forEach(function (o, i) { html += '<button type="button" class="wiz-opt" data-i="' + i + '">' + esc(o[0]) + '<small>' + esc(o[1]) + '</small></button>'; });
+      html += '</div>';
+    } else {
+      html += '<div class="wiz-res"><div class="wiz-res-h"><h4 class="wiz-q" tabindex="-1" style="margin:0">' + esc(node.t) + '</h4><span class="badge ' + node.b + '">' + BADGE[node.b] + '</span></div>' +
+        '<pre class="sh"></pre><p>' + esc(node.p) + '</p><a href="' + node.l + '">Подробнее в конспекте</a></div>';
+    }
+    html += '<div class="wiz-nav">' + (hist.length > 1
+      ? '<button type="button" class="ghost-btn" data-nav="back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Назад</button><button type="button" class="ghost-btn" data-nav="restart"><svg class="ico" aria-hidden="true"><use href="#i-replay"/></svg>Начать заново</button>'
+      : '') + '</div>';
+    var wrap = document.createElement('div'); wrap.className = 'wiz-anim'; wrap.innerHTML = html;
+    body.innerHTML = ''; body.appendChild(wrap);
+    var pre = $('pre.sh', wrap);
+    if (pre) { pre.textContent = node.code; enhancePre(pre); }
+    $$('.wiz-opt', wrap).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var o = node.o[+b.getAttribute('data-i')];
+        hist.push({ k: o[2], label: o[0] }); render(true);
+      });
+    });
+    $$('[data-nav]', wrap).forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.getAttribute('data-nav') === 'back') hist.pop(); else hist = [{ k: 'start' }];
+        render(true);
+      });
+    });
+    if (focus) { var q = $('.wiz-q', wrap); if (q) q.focus({ preventScroll: true }); }
+  }
+  render(false);
+})();
+
+/* =========================================================
+   ПОИСК ПО РЕЦЕПТАМ
+   ========================================================= */
+(function () {
+  var inp = $('#recipeSearch'); if (!inp) return;
+  var rows = $$('#recipes tbody tr:not(.empty)'), empty = $('#recipes tr.empty'), cnt = $('#recipeCount');
+  function norm(s) { return s.toLowerCase().replace(/ё/g, 'е'); }
+  rows.forEach(function (r) { r._t = norm(r.textContent); });
+  function stem(w) { return w.length >= 7 ? w.slice(0, -2) : w.length >= 5 ? w.slice(0, -1) : w; }
+  inp.addEventListener('input', function () {
+    var q = norm(inp.value.trim()), words = q.split(/\s+/).filter(Boolean).map(stem), n = 0;
+    rows.forEach(function (r) {
+      var ok = words.every(function (w) { return r._t.indexOf(w) >= 0; });
+      r.hidden = !ok; if (ok) n++;
+    });
+    empty.hidden = n > 0;
+    cnt.textContent = q ? n + ' из ' + rows.length : '';
+  });
+})();
+
+/* =========================================================
+   ПРАКТИКУМ: отметки выполнения
+   ========================================================= */
+(function () {
+  var EXK = 'gitundo-ex', done = {};
+  try { done = JSON.parse(localStorage.getItem(EXK) || '{}') || {}; } catch (e) { done = {}; }
+  var boxes = $$('input[data-exc]'), bar = $('#exBar'), cnt = $('#exCount');
+  function update() {
+    var n = 0;
+    boxes.forEach(function (b) {
+      b.checked = !!done[b.getAttribute('data-exc')];
+      var ex = b.closest('.ex'); if (ex) ex.classList.toggle('done', b.checked);
+      if (b.checked) n++;
+    });
+    bar.style.width = (n / boxes.length * 100) + '%';
+    cnt.textContent = n === boxes.length ? 'Все ' + n + ' упражнений готовы' : n + ' из ' + boxes.length;
+  }
+  boxes.forEach(function (b) {
+    b.addEventListener('change', function () {
+      done[b.getAttribute('data-exc')] = b.checked;
+      try { localStorage.setItem(EXK, JSON.stringify(done)); } catch (e) {}
+      update();
+    });
+  });
+  update();
+})();
+
+/* =========================================================
+   ВОПРОСЫ: открыть / скрыть все
+   ========================================================= */
+(function () {
+  var btn = $('#qaAll'), qas = $$('#qaList details'); if (!btn) return;
+  function allOpen() { return qas.every(function (d) { return d.open; }); }
+  function sync() { btn.querySelector('span').textContent = allOpen() ? 'Скрыть все ответы' : 'Открыть все ответы'; }
+  btn.addEventListener('click', function () { var o = !allOpen(); qas.forEach(function (d) { d.open = o; }); sync(); });
+  qas.forEach(function (d) { d.addEventListener('toggle', sync); });
+})();
+
+/* =========================================================
+   ПЕЧАТЬ
+   ========================================================= */
+var opened = [];
+window.addEventListener('beforeprint', function () {
+  $$('details').forEach(function (d) { if (!d.open) { d.open = true; opened.push(d); } });
+});
+window.addEventListener('afterprint', function () {
+  opened.forEach(function (d) { d.open = false; }); opened = [];
+  document.body.classList.remove('print-cheat');
+});
+$('#printCheat').addEventListener('click', function () { document.body.classList.add('print-cheat'); window.print(); });
+
+/* Снимаем защиту от анимаций при загрузке */
+requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.remove('preload'); }); });
+})();
+</script>
+</body>
+</html>
